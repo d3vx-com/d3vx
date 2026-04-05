@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Worktrees
+.d3vx-worktrees/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+.env
+
+# Project references
+references/
+
+#docs
+docs/
+
+# Rust
+target/
+src-tui/target/
+**/*.rs.bk
+
+src-tui/target/
+claude-code-analysis/
+
+
+# Local Temporary Files
+:memory:*
+shadow.txt
+ts-errors.txt
+ts_errors.log
+true
+.d3vx/
+.claude/

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>d3vx Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 24px; }
+  h1 { font-size: 1.5rem; margin-bottom: 20px; color: #00d4ff; }
+  #sessions { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .card { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 16px; position: relative; }
+  .card h3 { font-size: 1rem; margin-bottom: 8px; color: #e0e0e0; }
+  .meta { font-size: 0.85rem; color: #a0a0b0; margin-bottom: 4px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .badge-working { background: #1a6b3c; color: #4ade80; }
+  .badge-done { background: #1e3a5f; color: #60a5fa; }
+  .badge-failed { background: #5f1e1e; color: #f87171; }
+  .badge-default { background: #3a3a4a; color: #a0a0b0; }
+  .cost { color: #fbbf24; font-weight: 600; }
+  .actions { margin-top: 12px; display: flex; gap: 8px; }
+  .btn { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+  .btn-kill { background: #7f1d1d; color: #fca5a5; }
+  .btn-msg { background: #1e3a5f; color: #93c5fd; }
+  .btn:hover { opacity: 0.85; }
+  #status-bar { margin-bottom: 16px; font-size: 0.85rem; color: #a0a0b0; }
+  .empty { text-align: center; padding: 40px; color: #666; }
+</style>
+</head>
+<body>
+<h1>d3vx Dashboard</h1>
+<div id="status-bar">Connecting...</div>
+<div id="sessions"><div class="empty">No active sessions</div></div>
+<script>
+const API = '';
+let sessions = {};
+
+function phaseBadge(phase) {
+  const map = { working: 'working', done: 'done', failed: 'failed', crashed: 'failed' };
+  const cls = map[phase] || 'default';
+  return `<span class="badge badge-${cls}">${phase}</span>`;
+}
+
+function renderCards() {
+  const el = document.getElementById('sessions');
+  const keys = Object.keys(sessions);
+  if (keys.length === 0) { el.innerHTML = '<div class="empty">No active sessions</div>'; return; }
+  el.innerHTML = keys.map(id => {
+    const s = sessions[id];
+    return `<div class="card">
+      <h3>${s.session_id}</h3>
+      <div class="meta">Phase: ${phaseBadge(s.phase)}</div>
+      <div class="meta">Branch: ${s.branch || '-'}</div>
+      <div class="meta">Cost: <span class="cost">$${s.cost_usd.toFixed(4)}</span></div>
+      <div class="meta">Duration: ${Math.round(s.duration_secs)}s</div>
+      <div class="actions">
+        <button class="btn btn-kill" onclick="killSession('${id}')">Kill</button>
+        <button class="btn btn-msg" onclick="sendMessage('${id}')">Message</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadSessions() {
+  try {
+    const res = await fetch(API + '/api/sessions');
+    const data = await res.json();
+    sessions = {};
+    for (const s of data) sessions[s.session_id] = s;
+    renderCards();
+    document.getElementById('status-bar').textContent = `Connected | ${Object.keys(sessions).length} session(s)`;
+  } catch (e) {
+    document.getElementById('status-bar').textContent = 'Failed to load sessions';
+  }
+}
+
+async function killSession(id) {
+  await fetch(API + '/api/sessions/' + id + '/kill', { method: 'POST' });
+}
+
+async function sendMessage(id) {
+  const msg = prompt('Enter message for session ' + id);
+  if (!msg) return;
+  await fetch(API + '/api/sessions/' + id + '/message', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: msg })
+  });
+}
+
+const es = new EventSource(API + '/api/events');
+es.onmessage = function(e) {
+  const ev = JSON.parse(e.data);
+  if (ev.type === 'task_status_changed' && sessions[ev.id]) {
+    sessions[ev.id].phase = ev.phase;
+    renderCards();
+  } else if (ev.type === 'cost_update' && sessions[ev.task_id]) {
+    sessions[ev.task_id].cost_usd = ev.cost_usd;
+    renderCards();
+  } else {
+    loadSessions();
+  }
+};
+es.onerror = function() {
+  document.getElementById('status-bar').textContent = 'SSE disconnected -- retrying...';
+};
+
+loadSessions();
+setInterval(loadSessions, 15000);
+</script>
+</body>
+</html>
