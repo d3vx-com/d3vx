@@ -12,7 +12,6 @@ use tracing::info;
 use super::engine::{PipelineEngine, PipelineRunResult};
 use super::github::{sync_github_task_finished, sync_github_task_started};
 use super::phases::{PhaseContext, Task};
-use crate::agent::AgentLoop;
 
 /// State of an issue's pipeline execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,7 +107,7 @@ impl IssueRunner {
     pub async fn run(
         &mut self,
         engine: Arc<PipelineEngine>,
-        agent: Option<Arc<crate::agent::AgentLoop>>,
+        _agent: Option<Arc<crate::agent::AgentLoop>>,
     ) -> PipelineRunResult {
         let context = self.build_context();
 
@@ -144,7 +143,7 @@ impl IssueRunner {
     pub async fn sync_to_github(
         &self,
         github_config: Option<crate::config::GitHubIntegration>,
-        integration_cfg: Option<&crate::config::GitHubIntegration>,
+        _integration_cfg: Option<&crate::config::GitHubIntegration>,
         agent: Option<Arc<crate::agent::AgentLoop>>,
     ) -> anyhow::Result<()> {
         let Some(result) = &self.result else {

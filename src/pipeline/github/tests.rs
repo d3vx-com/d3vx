@@ -1,8 +1,5 @@
 //! Integration tests for GitHub webhook handling
 
-use super::types::{CIStatus, GitHubEvent};
-use super::webhook::GitHubIntegration;
-use crate::pipeline::phases::Priority;
 
 #[test]
 fn test_issue_opened_to_task() {

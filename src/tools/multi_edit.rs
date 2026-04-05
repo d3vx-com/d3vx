@@ -145,7 +145,7 @@ impl Tool for MultiEditTool {
         let mut applied: Vec<String> = Vec::new();
 
         for (i, (mat, new_string)) in parsed_edits.iter().enumerate() {
-            let before_len = new_content.len();
+            let _before_len = new_content.len();
             new_content = format!(
                 "{}{}{}",
                 &new_content[..mat.start],

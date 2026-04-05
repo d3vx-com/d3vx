@@ -65,6 +65,7 @@ pub struct QAIntegration {
     config: QAIntegrationConfig,
     max_cycles: u32,
     state: QAState,
+    #[allow(dead_code)]
     cycles_completed: u32,
 }
 
@@ -94,7 +95,7 @@ impl QAIntegration {
         diff: &str,
         changed_files: &[String],
     ) -> QAResult {
-        let qa_loop = QALoop::new(task_id.to_string(), QAConfig::default());
+        let _qa_loop = QALoop::new(task_id.to_string(), QAConfig::default());
         let mut blockers = Vec::new();
         let mut validation_passed = false;
         let mut review_passed = false;

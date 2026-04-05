@@ -17,6 +17,9 @@ mod tests_crud;
 #[cfg(test)]
 mod tests_queries;
 
+#[cfg(test)]
+mod tests_state_machine;
+
 use rusqlite::Connection;
 
 use super::database::Database;

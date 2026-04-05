@@ -29,6 +29,7 @@ pub mod utils;
 // Re-exports
 pub use app::App;
 pub use cli::{execute, Cli, CliCommand};
+pub use cli::commands::AppError;
 pub use config::{get_api_key, get_provider_config, load_config, D3vxConfig, LoadConfigOptions};
 pub use pipeline::{
     create_handler, default_handlers, DocsHandler, ImplementHandler, Phase, PhaseContext,

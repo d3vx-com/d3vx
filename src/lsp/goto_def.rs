@@ -2,7 +2,7 @@
 //!
 //! Provides go-to-definition and find-references functionality.
 
-use lsp_types::{Location, Position, Range};
+use lsp_types::Location;
 use std::path::Path;
 
 pub struct GotoProvider;

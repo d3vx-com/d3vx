@@ -24,6 +24,7 @@ pub trait AgentProvider: Send + Sync {
 pub struct SddExecutor {
     provider: Arc<dyn AgentProvider>,
     /// Max seconds to wait for each subagent
+    #[allow(dead_code)]
     subagent_timeout_secs: u64,
 }
 

@@ -1,6 +1,5 @@
 //! Agent state type tests
 
-use super::{is_valid_transition, AgentState, StateTransitionReason};
 
 #[test]
 fn test_agent_state_display() {

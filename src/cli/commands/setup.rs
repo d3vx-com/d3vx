@@ -1,6 +1,8 @@
 //! Setup and Init Command Implementations
 //!
-//! Project initialization, interactive setup wizard, and status display.
+//! Covers two entry points:
+//!   `d3vx init`  — scaffold .d3vx/ in a project
+//!   `d3vx setup` — interactive global provider wizard
 
 use anyhow::{Context, Result};
 use std::fs::{self, File};
@@ -8,262 +10,183 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use crate::config::defaults::get_global_config_path;
+use crate::config::onboarding::check_onboarding_status;
 use crate::utils::project::{detect_project, generate_project_md};
 
 use crate::cli::commands::helpers::{prompt_input, prompt_yes_no, provider_default_models};
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────────────────────
+
 pub(crate) async fn execute_init(path: Option<&PathBuf>) -> Result<()> {
-    let project_root = path
+    let root = path
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
-    let d3vx_dir = project_root.join(".d3vx");
+    let d3vx_dir = root.join(".d3vx");
 
     if d3vx_dir.exists() {
-        println!("Warning: .d3vx already exists.");
+        println!("  Warning: .d3vx/ already exists at {}", root.display());
         return Ok(());
     }
 
-    println!("Initializing d3vx...\n");
+    println!("\n  Initializing d3vx in {}\n", root.display());
 
-    // Detect project info
-    let detected = detect_project(&project_root);
+    let detected = detect_project(&root);
 
-    // Create directories
     fs::create_dir_all(d3vx_dir.join("memory"))?;
     fs::create_dir_all(d3vx_dir.join("sessions"))?;
     fs::create_dir_all(d3vx_dir.join("hooks"))?;
 
-    // Create config.yml
-    let config_path = d3vx_dir.join("config.yml");
-    let mut config_file = File::create(config_path)?;
-    config_file.write_all(
-        b"# d3vx Configuration
-# See docs for full options
+    write_project_config(&d3vx_dir)?;
+    write_project_md(&d3vx_dir, &detected)?;
+    write_gitignore_entry(&root)?;
 
-provider: anthropic
-model: claude-sonnet-4-20250514
-
-# Permission patterns
-permissions:
-  allow: []
-  deny:
-    - \"BashTool(cmd:sudo *)\"
-    - \"BashTool(cmd:rm -rf /)\"
-
-# Git Integration & Pre-Commit Hooks
-git:
-  auto_commit: true
-  auto_push: false
-  pre_commit_hooks:
-    format: true
-    clippy: true
-    test: true
-    security: true
-    skip_if_wip: true
-    timeout_seconds: 60
-",
-    )?;
-
-    // Create project.md with detected info
-    let project_md_content = generate_project_md(&detected);
-    let project_md_path = d3vx_dir.join("project.md");
-    fs::write(project_md_path, project_md_content)?;
-
-    // Create todo.md
-    let todo_path = d3vx_dir.join("todo.md");
-    let mut todo_file = File::create(todo_path)?;
-    todo_file.write_all(b"# Todo\n\n")?;
-
-    // Update .gitignore
-    if project_root.join(".git").exists() {
-        let gitignore_path = project_root.join(".gitignore");
-        let mut gitignore_content = if gitignore_path.exists() {
-            fs::read_to_string(&gitignore_path)?
-        } else {
-            String::new()
-        };
-
-        if !gitignore_content.contains(".d3vx-worktrees") {
-            if !gitignore_content.is_empty() && !gitignore_content.ends_with('\n') {
-                gitignore_content.push('\n');
-            }
-            gitignore_content.push_str("\n# d3vx worktrees\n.d3vx-worktrees/\n");
-            fs::write(&gitignore_path, gitignore_content)?;
-            println!("  Added .d3vx-worktrees/ to .gitignore");
-        }
-    }
-
-    println!("  Created .d3vx/config.yml");
-    println!("  Created .d3vx/project.md");
-    println!("  Created .d3vx/memory/");
-    println!("  Created .d3vx/sessions/");
-
-    let detected_label = if detected.framework != "Unknown" {
+    let label = if detected.framework != "Unknown" {
         format!("{} ({})", detected.framework, detected.language)
     } else {
-        detected.language
+        detected.language.clone()
     };
 
-    println!("\nd3vx initialized! Detected: {}", detected_label);
+    println!("  \x1b[32m✔\x1b[0m .d3vx/ initialized — detected: {label}");
     if !detected.build_command.is_empty() {
-        println!("  Build: {}", detected.build_command);
+        println!("      build: {}", detected.build_command);
     }
     if !detected.test_command.is_empty() {
-        println!("  Test: {}", detected.test_command);
+        println!("      test:  {}", detected.test_command);
     }
-    println!("Edit .d3vx/project.md to describe your project.\n");
+    println!("\n  Edit .d3vx/project.md to describe your project context.");
+    println!("  Run \x1b[1md3vx setup\x1b[0m to configure your LLM provider.\n");
+
     Ok(())
 }
 
-pub(crate) async fn execute_setup(provider: Option<&str>) -> Result<()> {
+// ─────────────────────────────────────────────────────────────────────────────
+// Setup wizard
+// ─────────────────────────────────────────────────────────────────────────────
+
+pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
     use crate::providers::SUPPORTED_PROVIDERS;
 
-    println!("\n  d3vx Interactive Setup\n");
-    println!("{}", "=".repeat(50));
+    print_banner();
 
-    let all_providers: Vec<_> = SUPPORTED_PROVIDERS.all().collect();
+    // Detect first-run state and surface it early
+    let status = check_onboarding_status();
+    if status.is_first_run {
+        println!("  \x1b[33m!\x1b[0m  First run detected — let's get you configured.\n");
+    }
 
-    // Select provider
-    let selected_provider = if let Some(p) = provider {
-        if !SUPPORTED_PROVIDERS.is_supported(p) {
-            anyhow::bail!(
-                "Unknown provider '{}'. Run `d3vx doctor` to see supported providers.",
-                p
-            );
-        }
-        p.to_string()
-    } else {
-        println!("\nSelect your LLM provider:\n");
-        for (i, provider_info) in all_providers.iter().enumerate() {
-            let marker = if provider_info.id == "anthropic" {
-                " (default)"
-            } else {
-                ""
-            };
-            println!(
-                "  {}. {:<12} - {}{}",
-                i + 1,
-                provider_info.id,
-                provider_info.name,
-                marker
-            );
-        }
-        println!("\n  0. Exit setup");
-        println!("\nEnter number or provider name: ");
-
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-        let input = input.trim();
-
-        if input == "0" {
-            println!("\nSetup cancelled.");
-            return Ok(());
-        }
-
-        // Try to parse as number
-        if let Ok(num) = input.parse::<usize>() {
-            if num == 0 || num > all_providers.len() {
-                anyhow::bail!("Invalid selection");
-            }
-            all_providers[num - 1].id.to_string()
-        } else {
-            // Try as provider name
-            if !SUPPORTED_PROVIDERS.is_supported(input) {
-                anyhow::bail!(
-                    "Unknown provider '{}'. Run `d3vx doctor` to see supported providers.",
-                    input
-                );
-            }
-            input.to_string()
-        }
+    let all_providers: Vec<_> = {
+        // Sort for stable ordering: Anthropic first, then alphabetical
+        let mut list: Vec<_> = SUPPORTED_PROVIDERS.all().collect();
+        list.sort_by_key(|p| if p.id == "anthropic" { "\0" } else { p.id });
+        list
     };
 
-    let provider_info = SUPPORTED_PROVIDERS
-        .get(&selected_provider)
-        .ok_or_else(|| anyhow::anyhow!("Provider not found"))?;
+    let selected_id = select_provider(provider_arg, &all_providers)?;
 
-    println!("\n{:=<50}", "");
-    println!("\n  Configuring: {}", provider_info.name);
-    println!("\n{:=<50}", "");
+    let provider_info = SUPPORTED_PROVIDERS
+        .get(&selected_id)
+        .ok_or_else(|| anyhow::anyhow!("Provider '{}' not found in registry", selected_id))?;
+
+    println!("\n  \x1b[1mConfiguring: {}\x1b[0m", provider_info.name);
+    println!("  Config path: {}\n", get_global_config_path());
 
     let (default_cheap, default_standard, default_premium) =
-        provider_default_models(&selected_provider);
-
-    println!("\nProvider config target: {}", get_global_config_path());
-    println!(
-        "This global file applies across all your projects unless a repo overrides it with .d3vx/config.yml.\n"
-    );
+        provider_default_models(&selected_id);
 
     let standard_model = prompt_input("Standard model", Some(&default_standard))?;
-    let routing_enabled = prompt_yes_no("Enable 3-tier model routing?", true)?;
+    let routing_enabled = prompt_yes_no("Enable 3-tier model routing", true)?;
+
     let cheap_model = if routing_enabled {
-        prompt_input("Cheap model", Some(&default_cheap))?
+        prompt_input("Cheap model  (research/fast tasks)", Some(&default_cheap))?
     } else {
         standard_model.clone()
     };
     let premium_model = if routing_enabled {
-        prompt_input("Premium model", Some(&default_premium))?
+        prompt_input("Premium model (complex tasks)", Some(&default_premium))?
     } else {
         standard_model.clone()
     };
 
-    let yaml = render_setup_config_yaml(
-        &selected_provider,
+    let yaml = render_config_yaml(
+        &selected_id,
         &standard_model,
         routing_enabled,
         &cheap_model,
         &premium_model,
     )?;
 
-    println!("\nPlanned config:\n");
-    println!("{}", yaml);
+    println!("\n  Planned config:\n\n{yaml}");
 
-    if !prompt_yes_no("Write this to your global config?", true)? {
-        println!("\nSetup cancelled.");
+    if !prompt_yes_no("Write this to your global config", true)? {
+        println!("\n  Setup cancelled.");
         return Ok(());
     }
 
-    let config_path = PathBuf::from(get_global_config_path());
-    if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&config_path, yaml)?;
-    println!("\nWrote {}", config_path.display());
-
-    if selected_provider == "ollama" {
-        println!("\nOllama next steps:");
-        println!("  1. Install Ollama");
-        println!("  2. Pull your chosen models");
-        println!("  3. Start the server with `ollama serve`");
-        println!("  4. Run `d3vx doctor`");
-        return Ok(());
-    }
-
-    println!("\nAPI key setup:");
-    match selected_provider.as_str() {
-        "anthropic" => println!("  1. Visit: https://console.anthropic.com/settings/keys"),
-        "openai" => println!("  1. Visit: https://platform.openai.com/api-keys"),
-        "groq" => println!("  1. Visit: https://console.groq.com/keys"),
-        "openrouter" => println!("  1. Visit: https://openrouter.ai/keys"),
-        _ => println!("  1. Visit the provider's site and generate an API key"),
-    }
-    println!("  2. Add this to your shell profile:");
-    if provider_info.api_key_env.is_empty() {
-        println!("     # No API key required for {}", provider_info.name);
-    } else {
-        println!(
-            "     export {}=\"your-api-key-here\"",
-            provider_info.api_key_env
-        );
-    }
-    println!("  3. Restart your shell or run: source ~/.zshrc");
-    println!("  4. Verify with: d3vx doctor");
+    write_global_config(&yaml)?;
+    print_api_key_instructions(provider_info);
+    print_next_steps(provider_info);
 
     Ok(())
 }
 
-fn render_setup_config_yaml(
+// ─────────────────────────────────────────────────────────────────────────────
+// Private helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn print_banner() {
+    println!("\n  \x1b[1md3vx setup\x1b[0m\n");
+    println!("  {}\n", "─".repeat(46));
+}
+
+fn select_provider(arg: Option<&str>, all: &[&crate::providers::registry::ProviderInfo]) -> Result<String> {
+    use crate::providers::SUPPORTED_PROVIDERS;
+
+    if let Some(p) = arg {
+        if !SUPPORTED_PROVIDERS.is_supported(p) {
+            anyhow::bail!(
+                "Unknown provider '{p}'. Supported: {}",
+                all.iter().map(|x| x.id).collect::<Vec<_>>().join(", ")
+            );
+        }
+        return Ok(p.to_string());
+    }
+
+    println!("  Select your LLM provider:\n");
+    for (i, info) in all.iter().enumerate() {
+        let marker = if info.id == "anthropic" { " \x1b[90m(default)\x1b[0m" } else { "" };
+        let key_note = if info.requires_api_key {
+            format!("needs {}", info.api_key_env)
+        } else {
+            "no key needed".to_string()
+        };
+        println!("    {}. {:<12} {:<20} {}{}", i + 1, info.id, info.name, key_note, marker);
+    }
+    println!("    0. Exit\n");
+
+    let choice = prompt_input("Enter number or provider id", None)?;
+
+    if choice == "0" || choice.is_empty() {
+        anyhow::bail!("Setup cancelled.");
+    }
+
+    if let Ok(n) = choice.parse::<usize>() {
+        if n == 0 || n > all.len() {
+            anyhow::bail!("Invalid selection '{n}'");
+        }
+        return Ok(all[n - 1].id.to_string());
+    }
+
+    if SUPPORTED_PROVIDERS.is_supported(&choice) {
+        return Ok(choice);
+    }
+
+    anyhow::bail!("Unknown provider '{choice}'");
+}
+
+fn render_config_yaml(
     provider: &str,
     standard_model: &str,
     routing_enabled: bool,
@@ -271,43 +194,128 @@ fn render_setup_config_yaml(
     premium_model: &str,
 ) -> Result<String> {
     let mut root = serde_yaml::Mapping::new();
-    root.insert(
-        serde_yaml::Value::String("provider".to_string()),
-        serde_yaml::Value::String(provider.to_string()),
-    );
-    root.insert(
-        serde_yaml::Value::String("model".to_string()),
-        serde_yaml::Value::String(standard_model.to_string()),
-    );
+    let sv = |s: &str| serde_yaml::Value::String(s.to_string());
+    let bv = |b: bool| serde_yaml::Value::Bool(b);
+
+    root.insert(sv("provider"), sv(provider));
+    root.insert(sv("model"), sv(standard_model));
 
     if routing_enabled {
         let mut routing = serde_yaml::Mapping::new();
-        routing.insert(
-            serde_yaml::Value::String("enabled".to_string()),
-            serde_yaml::Value::Bool(true),
-        );
-        routing.insert(
-            serde_yaml::Value::String("complexity_routing".to_string()),
-            serde_yaml::Value::Bool(true),
-        );
-        routing.insert(
-            serde_yaml::Value::String("cheap_model".to_string()),
-            serde_yaml::Value::String(cheap_model.to_string()),
-        );
-        routing.insert(
-            serde_yaml::Value::String("standard_model".to_string()),
-            serde_yaml::Value::String(standard_model.to_string()),
-        );
-        routing.insert(
-            serde_yaml::Value::String("premium_model".to_string()),
-            serde_yaml::Value::String(premium_model.to_string()),
-        );
-        root.insert(
-            serde_yaml::Value::String("model_routing".to_string()),
-            serde_yaml::Value::Mapping(routing),
-        );
+        routing.insert(sv("enabled"), bv(true));
+        routing.insert(sv("complexity_routing"), bv(true));
+        routing.insert(sv("cheap_model"), sv(cheap_model));
+        routing.insert(sv("standard_model"), sv(standard_model));
+        routing.insert(sv("premium_model"), sv(premium_model));
+        root.insert(sv("model_routing"), serde_yaml::Value::Mapping(routing));
     }
 
     serde_yaml::to_string(&serde_yaml::Value::Mapping(root))
-        .context("Failed to render setup configuration")
+        .context("Failed to serialise configuration")
+}
+
+fn write_global_config(yaml: &str) -> Result<()> {
+    let path = PathBuf::from(get_global_config_path());
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&path, yaml)
+        .with_context(|| format!("Failed to write config to {}", path.display()))?;
+    println!("  \x1b[32m✔\x1b[0m Wrote {}", path.display());
+    Ok(())
+}
+
+fn print_api_key_instructions(info: &crate::providers::registry::ProviderInfo) {
+    if info.id == "ollama" {
+        println!("\n  Ollama next steps:");
+        println!("    1. Install Ollama: https://ollama.ai");
+        println!("    2. Pull a model:   ollama pull {}", info.default_model);
+        println!("    3. Start server:   ollama serve");
+        return;
+    }
+
+    println!("\n  API key setup:");
+
+    let url = match info.id {
+        "anthropic"  => "https://console.anthropic.com/settings/keys",
+        "openai"     => "https://platform.openai.com/api-keys",
+        "groq"       => "https://console.groq.com/keys",
+        "openrouter" => "https://openrouter.ai/keys",
+        "xai"        => "https://console.x.ai",
+        "mistral"    => "https://console.mistral.ai/api-keys",
+        "deepseek"   => "https://platform.deepseek.com/api_keys",
+        _            => "provider's dashboard",
+    };
+
+    println!("    1. Get your key: {url}");
+    if !info.api_key_env.is_empty() {
+        println!("    2. Add to your shell profile (~/.zshrc or ~/.bashrc):");
+        println!("         export {}=\"your-key-here\"", info.api_key_env);
+        println!("    3. Reload:  source ~/.zshrc");
+    }
+}
+
+fn print_next_steps(info: &crate::providers::registry::ProviderInfo) {
+    println!("\n  {}", "─".repeat(46));
+    println!("  \x1b[1mYou're almost ready.\x1b[0m Run these to verify:\n");
+    println!("    d3vx doctor");
+    println!("    d3vx \"add input validation to the login form\" --vex\n");
+
+    if info.id != "ollama" && !info.api_key_env.is_empty() {
+        println!(
+            "  \x1b[90mTip: set {} before running d3vx doctor\x1b[0m\n",
+            info.api_key_env
+        );
+    }
+}
+
+fn write_project_config(d3vx_dir: &PathBuf) -> Result<()> {
+    let config_path = d3vx_dir.join("config.yml");
+    let mut file = File::create(&config_path)?;
+    file.write_all(
+        b"# d3vx project configuration\n\
+          # Global config at ~/.d3vx/config.yml takes precedence for provider/model.\n\
+          # Use this file for project-specific overrides.\n\
+          \n\
+          # Uncomment to override provider for this project:\n\
+          # provider: openai\n\
+          # model: gpt-4o\n\
+          \n\
+          permissions:\n\
+            allow: []\n\
+            deny:\n\
+              - \"BashTool(cmd:sudo *)\"\n\
+              - \"BashTool(cmd:rm -rf /)\"\n",
+    )?;
+    Ok(())
+}
+
+fn write_project_md(d3vx_dir: &PathBuf, detected: &crate::utils::project::DetectedProject) -> Result<()> {
+    let content = generate_project_md(detected);
+    fs::write(d3vx_dir.join("project.md"), content)?;
+    Ok(())
+}
+
+fn write_gitignore_entry(root: &PathBuf) -> Result<()> {
+    if !root.join(".git").exists() {
+        return Ok(());
+    }
+    let gi_path = root.join(".gitignore");
+    let existing = if gi_path.exists() {
+        fs::read_to_string(&gi_path)?
+    } else {
+        String::new()
+    };
+
+    if existing.contains(".d3vx-worktrees") {
+        return Ok(());
+    }
+
+    let mut content = existing;
+    if !content.is_empty() && !content.ends_with('\n') {
+        content.push('\n');
+    }
+    content.push_str("\n# d3vx worktrees\n.d3vx-worktrees/\n");
+    fs::write(&gi_path, content)?;
+    Ok(())
 }

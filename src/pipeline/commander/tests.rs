@@ -1,6 +1,5 @@
 //! Commander Validation Tests
 
-use super::runner::parse_output_issues;
 use super::types::*;
 
 #[test]

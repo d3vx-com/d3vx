@@ -77,7 +77,7 @@ impl PhaseHandler for PlanHandler {
         // (the agent is instructed to write it there) into an ImplementationSpec.
         let plan_file = format!(".d3vx/plan-{}.json", task.id);
         let spec_path = std::path::Path::new(&context.worktree_path).join(&plan_file);
-        let spec = ImplementationSpec::load(&spec_path).ok();
+        let _spec = ImplementationSpec::load(&spec_path).ok();
         let spec_path_str = spec_path.to_string_lossy().to_string();
 
         let metadata = serde_json::json!({

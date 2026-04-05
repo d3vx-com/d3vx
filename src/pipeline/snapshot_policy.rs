@@ -65,7 +65,9 @@ pub enum SnapshotTrigger {
 pub struct SnapshotPolicy {
     config: SnapshotConfig,
     last_snapshot: Option<Instant>,
+    #[allow(dead_code)]
     resume_manager: Option<ResumeManager>,
+    #[allow(dead_code)]
     checkpoint_manager: CheckpointManager,
 }
 

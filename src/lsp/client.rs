@@ -1,16 +1,15 @@
 //! LSP Client Implementation
 
 use std::collections::HashMap;
-use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::Command;
 use tokio::sync::Mutex;
-use tokio::sync::{mpsc, oneshot, RwLock};
-use tracing::{debug, error, info, warn};
+use tokio::sync::{oneshot, RwLock};
+use tracing::{debug, info};
 
-use lsp_types::{ClientCapabilities, InitializeParams, ServerCapabilities};
+use lsp_types::ServerCapabilities;
 
 pub struct LspClient {
     stdin: Arc<Mutex<Option<tokio::process::ChildStdin>>>,
@@ -184,6 +183,7 @@ impl LspClient {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum LspResponse {
     Success(String),
     Error { code: i32, message: String },

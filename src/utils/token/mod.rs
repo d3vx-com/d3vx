@@ -12,6 +12,9 @@ pub mod message_tokens;
 pub mod model_limits;
 pub mod overflow;
 
+#[cfg(test)]
+mod tests;
+
 pub use estimator::{estimate_for_code, estimate_for_json, estimate_tokens_for_text};
 pub use message_tokens::{estimate_block_tokens, estimate_message_tokens, estimate_tokens};
 pub use model_limits::{get_default_limits, get_model_limits, ModelLimits, MODEL_LIMITS};

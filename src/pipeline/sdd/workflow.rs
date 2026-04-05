@@ -46,7 +46,7 @@ impl SddWorkflow {
         }
     }
 
-    pub fn with_defaults(planner: Planner, provider: std::sync::Arc<dyn AgentProvider>) -> Self {
+    pub fn with_defaults(_planner: Planner, provider: std::sync::Arc<dyn AgentProvider>) -> Self {
         let config = SddConfig::default();
         let gate = PlanGate::new(config.clone(), Default::default());
         Self {

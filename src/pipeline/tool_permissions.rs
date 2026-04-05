@@ -25,7 +25,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 /// The reason an auto-approval matched.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,7 +132,7 @@ impl ContextPermissionCache {
         &self,
         tool_name: &str,
         resource: Option<&str>,
-        project_path: Option<&str>,
+        _project_path: Option<&str>,
     ) -> ContextPermissionResult {
         // 1. Check permanent allowlist
         if self

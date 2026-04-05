@@ -6,6 +6,7 @@ use lsp_types::CompletionItem;
 use std::collections::HashMap;
 
 pub struct CompletionProvider {
+    #[allow(dead_code)]
     cache: HashMap<String, Vec<CompletionItem>>,
     max_items: usize,
 }

@@ -283,3 +283,122 @@ async fn test_callbacks() {
     assert_eq!(added_count.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(status_count.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
+
+// ── pure type tests (no async needed) ────────────────────────
+
+use super::types::{merge_json, QueueStats, TaskDependency, QueueError};
+
+#[test]
+fn test_queue_stats_default() {
+    let stats = QueueStats::default();
+    assert_eq!(stats.total, 0);
+    assert_eq!(stats.backlog, 0);
+    assert_eq!(stats.queued, 0);
+    assert_eq!(stats.in_progress, 0);
+    assert_eq!(stats.completed, 0);
+    assert_eq!(stats.failed, 0);
+    assert_eq!(stats.cancelled, 0);
+}
+
+#[test]
+fn test_queue_stats_clone() {
+    let stats = QueueStats { total: 5, queued: 3, in_progress: 2, ..Default::default() };
+    let cloned = stats.clone();
+    assert_eq!(cloned.total, 5);
+    assert_eq!(cloned.queued, 3);
+}
+
+#[test]
+fn test_dependency_satisfied_all_met() {
+    let dep = TaskDependency::new("task-1", vec!["task-0".to_string()]);
+    assert!(dep.check_satisfied(&["task-0".to_string()]).is_ok());
+}
+
+#[test]
+fn test_dependency_satisfied_not_met() {
+    let dep = TaskDependency::new("task-2", vec!["task-1".to_string()]);
+    let err = dep.check_satisfied(&["task-0".to_string()]).unwrap_err();
+    assert!(err.contains("task-1"));
+}
+
+#[test]
+fn test_dependency_no_deps_is_satisfied() {
+    let dep = TaskDependency::new("task-1", vec![]);
+    assert!(dep.check_satisfied(&[]).is_ok());
+}
+
+#[test]
+fn test_dependency_multiple_one_missing() {
+    let dep = TaskDependency::new("t3", vec!["t1".to_string(), "t2".to_string()]);
+    assert!(dep.check_satisfied(&["t1".to_string()]).is_err());
+    assert!(dep.check_satisfied(&["t1".to_string(), "t2".to_string()]).is_ok());
+}
+
+#[test]
+fn test_merge_json_top_level_addition() {
+    let existing = serde_json::json!({"a": 1});
+    let patch = serde_json::json!({"b": 2});
+    let result = merge_json(existing, patch);
+    assert_eq!(result["a"], 1);
+    assert_eq!(result["b"], 2);
+}
+
+#[test]
+fn test_merge_json_overwrites_field() {
+    let existing = serde_json::json!({"a": 1, "b": "old"});
+    let patch = serde_json::json!({"b": "new"});
+    let result = merge_json(existing, patch);
+    assert_eq!(result["b"], "new");
+}
+
+#[test]
+fn test_merge_json_nested_recursive_merging() {
+    let existing = serde_json::json!({"a": {"x": 1, "y": 2}});
+    let patch = serde_json::json!({"a": {"y": 99, "z": 3}});
+    let result = merge_json(existing, patch);
+    assert_eq!(result["a"]["x"], 1);
+    assert_eq!(result["a"]["y"], 99);
+    assert_eq!(result["a"]["z"], 3);
+}
+
+#[test]
+fn test_merge_json_replace_object_with_scalar() {
+    let existing = serde_json::json!({"a": {"x": 1}});
+    let patch = serde_json::json!({"a": "scalar"});
+    let result = merge_json(existing, patch);
+    assert_eq!(result["a"], "scalar");
+}
+
+#[test]
+fn test_merge_json_empty_patch() {
+    let existing = serde_json::json!({"a": 1});
+    let result = merge_json(existing, serde_json::json!({}));
+    assert_eq!(result["a"], 1);
+}
+
+#[test]
+fn test_merge_json_scalar_replacement() {
+    let existing = serde_json::json!({"a": 1});
+    let result = merge_json(existing, serde_json::json!("replaced"));
+    assert_eq!(result, "replaced");
+}
+
+#[test]
+fn test_merge_json_array_entirely_replaced() {
+    let existing = serde_json::json!({"arr": [1, 2, 3]});
+    let patch = serde_json::json!({"arr": [99]});
+    let result = merge_json(existing, patch);
+    assert_eq!(result["arr"], serde_json::json!([99]));
+}
+
+#[test]
+fn test_queue_error_display() {
+    let err = QueueError::NotFound("T-1".to_string());
+    assert!(err.to_string().contains("T-1"));
+
+    let err = QueueError::AlreadyExists("T-1".to_string());
+    assert!(err.to_string().contains("T-1"));
+
+    let err = QueueError::DependencyNotSatisfied("T-2".to_string());
+    assert!(err.to_string().contains("T-2"));
+}

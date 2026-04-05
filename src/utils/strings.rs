@@ -192,4 +192,115 @@ mod tests {
         assert_eq!(format_bytes(1024), "1.00KB");
         assert_eq!(format_bytes(1048576), "1.00MB");
     }
+
+    // ── Additional edge cases ─────────────────────────────────
+
+    #[test]
+    fn test_truncate_exact_boundary() {
+        // String exactly at max_len
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_zero_max() {
+        // Zero max length, should truncate all content except "..."
+        assert_eq!(truncate("hello", 3), "...");
+    }
+
+    #[test]
+    fn test_truncate_just_under() {
+        assert_eq!(truncate("abcde", 5), "abcde");
+    }
+
+    #[test]
+    fn test_current_dir_or_default() {
+        assert_eq!(current_dir_or_default(Some("/tmp")), "/tmp");
+        assert_eq!(current_dir_or_default(None), ".");
+    }
+
+    #[test]
+    fn test_capitalize_single_char() {
+        assert_eq!(capitalize("h"), "H");
+        assert_eq!(capitalize("H"), "H");
+    }
+
+    #[test]
+    fn test_snake_to_camel_leading_underscore() {
+        assert_eq!(snake_to_camel("_private"), "Private");
+    }
+
+    #[test]
+    fn test_snake_to_camel_no_underscore() {
+        assert_eq!(snake_to_camel("hello"), "hello");
+    }
+
+    #[test]
+    fn test_snake_to_camel_empty() {
+        assert_eq!(snake_to_camel(""), "");
+    }
+
+    #[test]
+    fn test_camel_to_snake_empty() {
+        assert_eq!(camel_to_snake(""), "");
+    }
+
+    #[test]
+    fn test_camel_to_snake_leading_uppercase() {
+        assert_eq!(camel_to_snake("HelloWorld"), "hello_world");
+    }
+
+    #[test]
+    fn test_parse_size_si_units() {
+        assert_eq!(parse_size("1K"), Some(1000));
+        assert_eq!(parse_size("1M"), Some(1_000_000));
+        assert_eq!(parse_size("1G"), Some(1_000_000_000));
+    }
+
+    #[test]
+    fn test_parse_size_plain_number() {
+        assert_eq!(parse_size("42"), Some(42));
+        assert_eq!(parse_size("0"), Some(0));
+    }
+
+    #[test]
+    fn test_parse_size_float() {
+        assert_eq!(parse_size("1.5KB"), Some(1536));
+    }
+
+    #[test]
+    fn test_parse_size_whitespace_trim() {
+        assert_eq!(parse_size(" 1KB "), Some(1024));
+    }
+
+    #[test]
+    fn test_format_bytes_zero() {
+        assert_eq!(format_bytes(0), "0B");
+    }
+
+    #[test]
+    fn test_format_bytes_gb() {
+        assert_eq!(format_bytes(1073741824), "1.00GB");
+    }
+
+    #[test]
+    fn test_is_ascii() {
+        assert!(is_ascii("Hello"));
+        assert!(!is_ascii("你好"));
+        assert!(is_ascii(""));
+    }
+
+    #[test]
+    fn test_strip_ansi_no_codes() {
+        assert_eq!(strip_ansi("plain text"), "plain text");
+    }
+
+    #[test]
+    fn test_strip_ansi_single() {
+        assert_eq!(strip_ansi("\x1b[31mred"), "red");
+    }
+
+    #[test]
+    fn test_strip_ansi_multiple() {
+        assert_eq!(strip_ansi("\x1b[1m\x1b[32mgreen\x1b[0m"), "green");
+    }
 }

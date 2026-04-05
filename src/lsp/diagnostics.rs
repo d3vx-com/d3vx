@@ -2,13 +2,14 @@
 //!
 //! Processes and formats LSP diagnostics for display.
 
-use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
+use lsp_types::{Diagnostic, DiagnosticSeverity};
 use std::collections::HashMap;
 use std::path::Path;
-use tracing::debug;
 
 pub struct DiagnosticManager {
+    #[allow(dead_code)]
     debounce_ms: u64,
+    #[allow(dead_code)]
     cache: HashMap<String, Vec<FormattedDiagnostic>>,
 }
 

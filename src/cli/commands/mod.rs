@@ -6,6 +6,7 @@
 mod config_cmd;
 mod daemon;
 mod doctor;
+pub mod error;
 mod helpers;
 mod oneshot;
 mod setup;
@@ -14,14 +15,14 @@ mod stubs;
 mod worktree;
 
 // Re-export types needed by other modules
-pub use helpers::DoctorRuntimeContext;
+pub use error::AppError;
+pub use helpers::{free_disk_mb, DoctorRuntimeContext};
 
 use anyhow::Result;
 
 use crate::cli::args::{Cli, CliCommand, DaemonAction};
 
 pub(crate) use doctor::build_doctor_report;
-pub(crate) use setup::execute_init;
 
 /// Execute a CLI command
 pub async fn execute(cli: Cli) -> Result<()> {

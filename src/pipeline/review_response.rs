@@ -160,7 +160,7 @@ impl ReviewResponseLoop {
     /// Fetch official reviews and review threads from the PR.
     pub async fn fetch_review_report(&self) -> anyhow::Result<ReviewCommentsReport> {
         let pr_str = self.pr_number.to_string();
-        let repo = &self.repository;
+        let _repo = &self.repository;
 
         // Fetch reviews: official review states
         let reviews = self.fetch_reviews(&pr_str).await?;

@@ -1,7 +1,7 @@
 //! Pipeline Phase Types
 //!
 //! Defines the phases of the pipeline execution system.
-//! Based on the 6-phase pipeline: Research -> Plan -> Draft -> Implement -> Review -> Docs
+//! Based on the 7-phase pipeline: Research -> Ideation -> Plan -> Draft -> Review -> Implement -> Docs
 
 pub mod task;
 #[cfg(test)]

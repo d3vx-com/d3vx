@@ -1,6 +1,5 @@
 //! Issue Sync Tests
 
-use super::{ExternalIssue, IssueState, IssueTracker, SyncError, SyncResult, TrackerKind};
 
 #[test]
 fn test_external_issue_fields() {

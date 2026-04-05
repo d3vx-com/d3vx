@@ -13,6 +13,7 @@ use crate::store::database::DatabaseError;
 use crate::store::task::{Task, TaskState, TaskStore, TaskUpdate};
 
 /// Errors from owned task operations.
+#[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum OwnedTaskError {
     #[error("Ownership error: {0}")]
@@ -32,17 +33,20 @@ pub enum OwnedTaskError {
 }
 
 /// Result type for owned task operations.
+#[allow(dead_code)]
 pub type OwnedTaskResult<T> = Result<T, OwnedTaskError>;
 
 /// Owned task store - TaskStore with ownership enforcement.
 ///
 /// This wrapper ensures that task mutations are only accepted from
 /// the current owner (as tracked by OwnershipManager).
+#[allow(dead_code)]
 pub struct OwnedTaskStore<'a> {
     inner: &'a TaskStore<'a>,
     ownership: &'a OwnershipManager,
 }
 
+#[allow(dead_code)]
 impl<'a> OwnedTaskStore<'a> {
     /// Create a new owned task store.
     pub fn new(task_store: &'a TaskStore, ownership: &'a OwnershipManager) -> Self {

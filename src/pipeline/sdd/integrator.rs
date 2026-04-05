@@ -44,7 +44,7 @@ impl SddIntegrator {
     pub fn integrate(
         &self,
         children: Vec<ChildResult>,
-        plan: &ExecutionPlan,
+        _plan: &ExecutionPlan,
         session: &mut super::types::SddSession,
     ) -> Result<IntegrationResult, SddError> {
         let success = children.iter().all(|c| c.success);

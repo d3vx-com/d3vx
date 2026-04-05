@@ -1,7 +1,7 @@
 //! Pipeline Engine Module
 //!
-//! Provides a 6-phase pipeline system for autonomous task execution:
-//! Research -> Plan -> Draft -> Review -> Implement -> Docs
+//! Provides a 7-phase pipeline system for autonomous task execution:
+//! Research -> Ideation -> Plan -> Draft -> Review -> Implement -> Docs
 //!
 //! # Overview
 //!
