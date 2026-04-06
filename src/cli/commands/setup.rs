@@ -110,12 +110,16 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
         standard_model.clone()
     };
 
+    // Custom base URL for proxies (OpenAI-compatible, LiteLLM, etc.)
+    let base_url = prompt_base_url(provider_info.base_url)?;
+
     let yaml = render_config_yaml(
         &selected_id,
         &standard_model,
         routing_enabled,
         &cheap_model,
         &premium_model,
+        base_url.as_deref(),
     )?;
 
     println!("\n  Planned config:\n\n{yaml}");
@@ -139,6 +143,13 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
 fn print_banner() {
     println!("\n  \x1b[1md3vx setup\x1b[0m\n");
     println!("  {}\n", "─".repeat(46));
+}
+
+fn prompt_base_url(default_base_url: Option<&str>) -> Result<Option<String>> {
+    let default = default_base_url.unwrap_or("");
+    let input = prompt_input("Custom base URL (e.g. https://openai.api-proxy.com/v1)", if default.is_empty() { None } else { Some(default) })?;
+    let trimmed = input.trim();
+    Ok(if trimmed.is_empty() { None } else { Some(trimmed.to_string()) })
 }
 
 fn select_provider(arg: Option<&str>, all: &[&crate::providers::registry::ProviderInfo]) -> Result<String> {
@@ -192,6 +203,7 @@ fn render_config_yaml(
     routing_enabled: bool,
     cheap_model: &str,
     premium_model: &str,
+    base_url: Option<&str>,
 ) -> Result<String> {
     let mut root = serde_yaml::Mapping::new();
     let sv = |s: &str| serde_yaml::Value::String(s.to_string());
@@ -199,6 +211,24 @@ fn render_config_yaml(
 
     root.insert(sv("provider"), sv(provider));
     root.insert(sv("model"), sv(standard_model));
+
+    // Provider-specific config with optional base_url
+    if let Some(url) = base_url {
+        if !url.is_empty() {
+            let mut provider_cfg = serde_yaml::Mapping::new();
+            provider_cfg.insert(sv("base_url"), sv(url));
+            root.insert(
+                sv("providers"),
+                serde_yaml::Value::Mapping({
+                    let mut providers = serde_yaml::Mapping::new();
+                    let mut configs = serde_yaml::Mapping::new();
+                    configs.insert(sv(provider), serde_yaml::Value::Mapping(provider_cfg));
+                    providers.insert(sv("configs"), serde_yaml::Value::Mapping(configs));
+                    providers
+                }),
+            );
+        }
+    }
 
     if routing_enabled {
         let mut routing = serde_yaml::Mapping::new();
