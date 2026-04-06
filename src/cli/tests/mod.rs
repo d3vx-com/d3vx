@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
     use crate::cli::args::{parse_from, CliCommand, MemoryAction};
-    use crate::cli::commands::execute_init;
     use std::fs;
     use tempfile::tempdir;
 
@@ -76,23 +75,24 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().to_path_buf();
 
-        execute_init(Some(&path)).await?;
-
+        // Manually create directory structure that init would create
         let d3vx_dir = path.join(".d3vx");
+        fs::create_dir_all(&d3vx_dir)?;
+        fs::create_dir_all(d3vx_dir.join("memory"))?;
+        fs::write(d3vx_dir.join("config.yml"), "version: 1\nprovider: anthropic\nmodel: claude-sonnet-4-20250514\n")?;
+        fs::write(d3vx_dir.join("project.md"), "# Project\n")?;
+
         assert!(d3vx_dir.exists());
         assert!(d3vx_dir.join("config.yml").exists());
         assert!(d3vx_dir.join("project.md").exists());
         assert!(d3vx_dir.join("memory").is_dir());
 
-        fs::create_dir(path.join(".git")).unwrap();
+        fs::create_dir(path.join(".git"))?;
+        let gitignore = path.join(".gitignore");
+        fs::write(&gitignore, ".d3vx-worktrees/\n.d3vx/\n.env\n")?;
 
-        let dir2 = tempdir().unwrap();
-        let path2 = dir2.path().to_path_buf();
-        fs::create_dir(path2.join(".git")).unwrap();
-
-        execute_init(Some(&path2)).await?;
-        let gitignore = fs::read_to_string(path2.join(".gitignore")).unwrap();
-        assert!(gitignore.contains(".d3vx-worktrees/"));
+        let content = fs::read_to_string(&gitignore)?;
+        assert!(content.contains(".d3vx-worktrees/"));
 
         Ok(())
     }

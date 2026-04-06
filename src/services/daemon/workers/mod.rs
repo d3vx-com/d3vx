@@ -119,7 +119,6 @@ pub(crate) fn collect_source_files(dir: &Path) -> Vec<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_builtin_workers_returns_all() {

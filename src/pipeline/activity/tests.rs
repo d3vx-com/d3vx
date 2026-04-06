@@ -1,5 +1,7 @@
 //! Activity Detection Tests
 
+use super::{ActivityConfig, ActivityState, ActivityTracker, BLOCKED_ERROR_THRESHOLD, TOOL_HISTORY_SIZE};
+use std::time::Duration;
 
 #[test]
 fn test_activity_config_default() {

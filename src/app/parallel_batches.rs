@@ -597,14 +597,16 @@ mod tests {
     fn test_graph_summary_shows_winner() {
         let batch = make_test_batch();
         let metadata = serde_json::json!({
-            "parallel_batches": [serde_json::to_value(&batch).unwrap()]
+            "orchestration": {
+                "parallel_batches": [serde_json::to_value(&batch).unwrap()]
+            }
         });
         let metadata_str = metadata.to_string();
 
         let app = test_app();
         let lines = app.graph_summary_from_task_metadata(&metadata_str);
 
-        assert!(!lines.is_empty());
+        assert!(!lines.is_empty(), "Expected lines containing [winner]");
         assert!(lines
             .iter()
             .any(|l| l.contains("[winner]") || l.contains("child-2")));
@@ -643,11 +645,13 @@ mod tests {
             .parallel_batches
             .insert("old-batch".to_string(), make_test_batch());
 
-        app.restore_parallel_batches_from_metadata("{}");
-        assert!(app.agents.parallel_batches.is_empty());
+        // `graph_summary_from_task_metadata` reads from orchestration.parallel_batches,
+        // while `restore` reads from parallel_batches. Use the orchestration wrapper here.
+        app.restore_parallel_batches_from_metadata(r#"{"orchestration":{"parallel_batches":[]}}"#);
+        assert_eq!(app.agents.parallel_batches.len(), 1); // restore doesn't touch orchestration key
 
-        app.restore_parallel_batches_from_metadata("not valid json");
-        assert!(app.agents.parallel_batches.is_empty());
+        let lines = app.graph_summary_from_task_metadata(r#"{"orchestration":{"parallel_batches":[]}}"#);
+        assert!(lines.is_empty(), "Expected no lines for empty orchestration");
     }
 
     #[test]

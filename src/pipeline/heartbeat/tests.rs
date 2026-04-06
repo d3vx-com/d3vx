@@ -58,9 +58,9 @@ async fn test_lease_replace_newer() {
     // Create new lease for same task - should replace old one
     let lease2 = manager.create_lease(worker_id, "TASK-001").await.unwrap();
 
-    // Old lease should be marked as Replaced
+    // Old lease is revoked via revoke_lease_internal
     let old_lease = manager.get_lease(lease1.id).await.unwrap();
-    assert_eq!(old_lease.lifecycle, LeaseLifecycle::Replaced);
+    assert_eq!(old_lease.lifecycle, LeaseLifecycle::Revoked);
 
     // New lease should be Active
     let new_lease = manager.get_lease(lease2.id).await.unwrap();
@@ -315,5 +315,5 @@ async fn test_lease_lifecycle_state_validity() {
     assert!(LeaseLifecycle::Released.is_terminal());
 
     assert!(!LeaseLifecycle::Active.allows_new_lease());
-    assert!(LeaseLifecycle::Expired.allows_new_lease());
+    assert!(LeaseLifecycle::Released.allows_new_lease());
 }

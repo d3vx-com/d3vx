@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use super::task_queue::TaskQueue;
-use super::types::QueueError;
+use super::{merge_json, QueueError, QueueStats, TaskDependency};
 use crate::pipeline::phases::{Priority, Task, TaskStatus};
 
 #[tokio::test]
@@ -285,8 +285,6 @@ async fn test_callbacks() {
 }
 
 // ── pure type tests (no async needed) ────────────────────────
-
-use super::types::{merge_json, QueueStats, TaskDependency, QueueError};
 
 #[test]
 fn test_queue_stats_default() {

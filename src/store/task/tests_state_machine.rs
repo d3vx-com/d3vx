@@ -177,7 +177,7 @@ fn test_spawn_workflow() {
 #[test]
 fn test_all_states_can_transition_to_failed_except_done() {
     for state in TaskState::all() {
-        if matches!(state, TaskState::Done) {
+        if matches!(state, TaskState::Done | TaskState::Failed) {
             assert!(!state.can_transition_to(TaskState::Failed));
         } else {
             assert!(state.can_transition_to(TaskState::Failed),

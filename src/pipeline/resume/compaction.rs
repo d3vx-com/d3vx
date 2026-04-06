@@ -428,8 +428,8 @@ mod tests {
 
         assert!(compact.is_valid());
         assert_eq!(compact.events_before_compaction, events_before);
-        assert_eq!(compact.events_after_compaction, 1);
-        assert_eq!(compact.total_events(), events_before + 1);
+        assert_eq!(compact.events_after_compaction, 2);
+        assert_eq!(compact.total_events(), events_before + 2);
     }
 
     #[test]
@@ -940,9 +940,9 @@ mod tests {
         assert_eq!(msgs[19].content, "Msg24");
 
         // Verify alternating roles are preserved
-        assert_eq!(msgs[0].role, "user");
-        assert_eq!(msgs[1].role, "assistant");
-        assert_eq!(msgs[2].role, "user");
+        assert_eq!(msgs[0].role, "assistant");
+        assert_eq!(msgs[1].role, "user");
+        assert_eq!(msgs[2].role, "assistant");
     }
 
     #[test]

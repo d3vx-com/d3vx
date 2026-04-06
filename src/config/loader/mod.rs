@@ -13,6 +13,8 @@ pub mod loading;
 mod merging;
 
 #[cfg(test)]
+mod merging_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::HashMap;

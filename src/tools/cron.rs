@@ -252,6 +252,7 @@ impl Tool for CronListTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     fn clear_registry() {
         CRON_REGISTRY.write().unwrap().clear();
@@ -262,6 +263,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn create_validates_cron_expression() {
         clear_registry();
         let tool = CronCreateTool::new();
@@ -304,6 +306,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn delete_removes_job() {
         clear_registry();
         let create = CronCreateTool::new();
@@ -332,6 +335,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn list_returns_all_entries() {
         clear_registry();
         let create = CronCreateTool::new();

@@ -1,5 +1,9 @@
 //! Agent state tracker tests
 
+use crate::agent::state::{AgentState, AgentStateTracker, StateTransitionReason};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 #[tokio::test]
 async fn test_state_tracker_initial_state() {

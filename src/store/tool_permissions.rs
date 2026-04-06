@@ -128,7 +128,6 @@ impl<'a> ToolPermissionStore<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     #[test]
     fn test_save_and_load() {

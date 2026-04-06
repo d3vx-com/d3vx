@@ -16,8 +16,16 @@ pub mod compact_agent;
 pub mod context;
 pub mod conversation;
 pub mod cost;
+#[cfg(test)]
+mod cost_tests;
 pub mod doom_loop;
+#[cfg(test)]
+mod doom_loop_tests;
 pub mod file_change_log;
+#[cfg(test)]
+mod specialists_tests;
+#[cfg(test)]
+mod step_controller_tests;
 pub mod guard;
 pub mod logger;
 pub mod orchestrator;

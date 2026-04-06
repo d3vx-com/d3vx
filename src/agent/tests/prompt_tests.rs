@@ -1,6 +1,122 @@
-//! Test to verify the system prompt guides the LLM to use spawn_parallel_agents for codebase analysis
+//! Tests for prompt module — Role enum, build_system_prompt
 
-use crate::agent::prompt::build_system_prompt_with_options;
+use crate::agent::prompt::{build_system_prompt, build_system_prompt_with_options, Role};
+
+// ─── Role enum tests ───────────────────────────────────────────────────────
+
+#[test]
+fn test_role_variants_exist() {
+    let roles = vec![
+        Role::TechLead,
+        Role::Executor,
+        Role::BackendDev,
+        Role::FrontendDev,
+        Role::DevOps,
+        Role::QA,
+    ];
+    assert_eq!(roles.len(), 6);
+}
+
+#[test]
+fn test_role_descriptions_non_empty() {
+    for role in [
+        Role::TechLead,
+        Role::Executor,
+        Role::BackendDev,
+        Role::FrontendDev,
+        Role::DevOps,
+        Role::QA,
+    ] {
+        let desc = role.description();
+        assert!(!desc.is_empty(), "Role {:?} has empty description", role);
+    }
+}
+
+#[test]
+fn test_role_techlead_description_mentions_parallels() {
+    let desc = Role::TechLead.description();
+    assert!(
+        desc.contains("SpawnParallel") || desc.contains("spawn_parallel"),
+        "TechLead role should mention parallel spawning"
+    );
+}
+
+#[test]
+fn test_role_executor_description_mentions_boundaries() {
+    let desc = Role::Executor.description();
+    assert!(
+        desc.to_lowercase().contains("boundary") || desc.to_lowercase().contains("scope"),
+        "Executor role should mention working within boundaries"
+    );
+}
+
+#[test]
+fn test_role_backend_mentions_api() {
+    let desc = Role::BackendDev.description();
+    let lower = desc.to_lowercase();
+    assert!(
+        lower.contains("api") || lower.contains("database"),
+        "Backend role should mention API/database"
+    );
+}
+
+#[test]
+fn test_role_qa_mentions_testing() {
+    let desc = Role::QA.description();
+    let lower = desc.to_lowercase();
+    assert!(
+        lower.contains("test") || lower.contains("qa"),
+        "QA role should mention testing"
+    );
+}
+
+#[test]
+fn test_role_serialization_roundtrip() {
+    for role in [
+        Role::TechLead,
+        Role::Executor,
+        Role::BackendDev,
+        Role::FrontendDev,
+        Role::DevOps,
+        Role::QA,
+    ] {
+        let json = serde_json::to_string(&role).unwrap();
+        let parsed: Role = serde_json::from_str(&json).unwrap();
+        assert_eq!(role, parsed);
+    }
+}
+
+// ─── build_system_prompt tests ──────────────────────────────────────────────
+
+#[test]
+fn test_build_system_prompt_contains_core_identity() {
+    let prompt = build_system_prompt("/tmp", None);
+    assert!(
+        prompt.contains("d3vx"),
+        "Prompt should contain agent identity"
+    );
+}
+
+#[test]
+fn test_build_system_prompt_contains_environment() {
+    let prompt = build_system_prompt("/tmp", None);
+    assert!(prompt.contains("Current Working Directory"));
+    assert!(prompt.contains("/tmp"));
+}
+
+#[test]
+fn test_build_system_prompt_with_role() {
+    let prompt = build_system_prompt("/tmp", Some(&Role::QA));
+    assert!(prompt.contains("QA"));
+}
+
+#[test]
+fn test_build_system_prompt_with_techlead_role() {
+    let prompt = build_system_prompt("/tmp", Some(&Role::TechLead));
+    assert!(prompt.contains("spawn_parallel") || prompt.contains("SpawnParallel"));
+}
+
+// ─── Parallel agents prompt tests ──────────────────────────────────────────
 
 #[test]
 fn test_codebase_analysis_with_parallel_agents() {

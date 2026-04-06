@@ -1,3 +1,5 @@
+use super::{FileChangeLog, FileSnapshot};
+use std::fs;
 
 #[test]
 fn test_empty_log() {

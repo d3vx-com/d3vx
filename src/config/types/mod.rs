@@ -25,6 +25,15 @@ pub mod types_sandbox;
 pub mod types_structured_output;
 pub mod types_ui;
 
+#[cfg(test)]
+mod tests_defaults;
+#[cfg(test)]
+mod tests_flags_features;
+#[cfg(test)]
+mod tests_types;
+#[cfg(test)]
+mod tests_types2;
+
 // Re-export all types for backward compatibility
 pub use agent::{
     AgentEnhancementsConfig, BestOfNSettings, CompactionSettings, DoomLoopSettings, SkillsSettings,

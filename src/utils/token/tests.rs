@@ -1,6 +1,8 @@
 //! Token estimation tests
 
-use super::*;
+use super::estimator::{estimate_for_code, estimate_for_content, estimate_for_json, estimate_tokens_for_text};
+use super::model_limits::{get_default_limits, get_model_limits, ModelLimits};
+use super::overflow::{ContextOverflowCheck, COMPACTION_BUFFER, is_context_overflow};
 
 // ── Estimator Tests ──────────────────────────────────────────
 
@@ -58,10 +60,10 @@ fn test_code_estimation_empty() {
 #[test]
 fn test_json_estimation() {
     // JSON uses chars/token × 0.9, so more tokens (repetitive structure)
-    let json = r#"{"key": "value", "a": 1}"#;
-    let text_tokens = estimate_tokens_for_text(json);
-    let json_tokens = estimate_for_json(json);
-    assert!(json_tokens > text_tokens, "json tokens should be higher due to repetitive structure");
+    let long_json = r#"{"users": [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}], "count": 2}"#;
+    let long_text = estimate_tokens_for_text(long_json);
+    let long_json_tokens = estimate_for_json(long_json);
+    assert!(long_json_tokens > long_text, "json tokens should be higher due to repetitive structure");
 }
 
 #[test]
@@ -188,9 +190,10 @@ fn test_overflow_new_total_is_input_plus_output() {
 
 #[test]
 fn test_overflow_boundary_exact_at_usable_limit() {
-    // 200k - 20k buffer (min of reserved vs model name token) = ~180k usable
-    // 180k input should be overflow
-    let check = ContextOverflowCheck::new("claude-3-7-sonnet-20250219", 180_000, 0);
+    // 200k context, reserved = min(20_000, model_est=6) = 6
+    // usable = 200_000 - 6 = 199_994
+    // 199_994 input + 0 output = 199_994 total >= 199_994 → overflow
+    let check = ContextOverflowCheck::new("claude-3-7-sonnet-20250219", 199_994, 0);
     assert!(check.is_overflow());
 }
 

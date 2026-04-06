@@ -438,8 +438,10 @@ mod tests {
             "add new feature",
         );
         assert!(result.docs_required);
-        // Breaking change still requires changelog, but feature change check should find it
-        assert!(!result.blocks_merge() || result.satisfied);
+        // README still needed (src/lib.rs changed but no README update), so blocks_merge=true
+        assert!(result.blocks_merge());
+        assert_eq!(result.missing_types.len(), 1);
+        assert!(result.missing_types.contains(&DocType::Readme));
     }
 
     #[test]
@@ -463,7 +465,9 @@ mod tests {
         let evaluator = DocsCompletenessEvaluator::new(".".into());
         let result = evaluator.evaluate(&["src/lib.rs".to_string()], "add feature");
         let ui = result.summary_for_ui();
-        assert!(ui.can_merge || !ui.blocks_merge);
+        // src/lib.rs changed → needs README → blocks merge
+        assert!(ui.blocks_merge);
+        assert!(!ui.can_merge);
     }
 
     #[test]

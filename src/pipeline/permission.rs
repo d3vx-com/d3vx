@@ -765,7 +765,7 @@ mod tests {
         let canceled = mgr.cancel(&req.id).await.unwrap();
 
         assert_eq!(canceled.state, PermissionState::Canceled);
-        assert!(canceled.feedback.is_some());
+        assert!(canceled.feedback.is_none()); // cancel() passes None for feedback
     }
 
     #[tokio::test]

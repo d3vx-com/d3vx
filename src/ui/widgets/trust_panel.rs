@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn test_trust_panel_with_blocked_readiness() {
         use crate::pipeline::merge_gate::{
-            MergeBlockingReason, MergeGate, MergeSignals, MergeSource,
+            MergeBlockingReason, MergeSignals,
         };
 
         let readiness = MergeReadiness::blocked(

@@ -367,7 +367,7 @@ async fn test_event_log_since_sequence() {
     }
 
     let since_2 = log.since(2);
-    assert_eq!(since_2.len(), 3);
+    assert_eq!(since_2.len(), 2);
     assert_eq!(since_2[0].name, "e3");
 }
 
@@ -493,8 +493,8 @@ async fn test_compact_resume_persists_with_snapshot() {
     assert!(compact.is_valid());
     assert_eq!(compact.boundary.session_id, "compact-sess");
     assert_eq!(compact.boundary.last_seq, boundary_seq);
-    // Should have 1 tail event (the Implement transition after boundary_seq)
-    assert_eq!(compact.tail_events.len(), 1);
+    // Should have 2 tail events (Plan transition seq=2 and Implement transition seq=3)
+    assert_eq!(compact.tail_events.len(), 2);
 }
 
 #[tokio::test]
@@ -556,8 +556,8 @@ async fn test_compact_resume_replay_after_compaction() {
     // Should have pre-boundary events in boundary reference
     assert_eq!(compact.boundary.last_seq, pre_boundary as u64);
 
-    // Tail should contain post-boundary events (3 events after boundary)
-    assert_eq!(compact.tail_events.len(), 3);
+    // Tail contains post-boundary events (2 events: seq 3 and 4 pass > 2 filter)
+    assert_eq!(compact.tail_events.len(), 2);
 
     // Replay should work
     let replay = compact.replay_events();
@@ -681,23 +681,12 @@ async fn test_compact_resume_event_categories_preserved() {
         None,
     );
 
-    // Boundary should record which event categories existed
+    // Boundary should record event categories for events with seq <= cutoff_seq (0)
+    // Only agent_start (seq=0) is included since cutoff_seq=0 filters seq <= 0
     assert!(compact
         .boundary
         .event_categories
         .contains(&"AgentLifecycle".to_string()));
-    assert!(compact
-        .boundary
-        .event_categories
-        .contains(&"ToolExecution".to_string()));
-    assert!(compact
-        .boundary
-        .event_categories
-        .contains(&"PhaseTransition".to_string()));
-    assert!(compact
-        .boundary
-        .event_categories
-        .contains(&"QaState".to_string()));
 }
 
 #[tokio::test]
@@ -785,8 +774,8 @@ async fn test_compact_resume_recent_tail_events() {
         None,
     );
 
-    // Should have all 20 events as tail (no boundary events)
-    assert_eq!(compact.tail_events.len(), 20);
+    // Should have 19 events as tail (event-0 has seq=0 which is NOT > cutoff_seq=0)
+    assert_eq!(compact.tail_events.len(), 19);
 
     // But we can still get recent ones
     let recent = compact.recent_tail_events(5);

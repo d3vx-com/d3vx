@@ -254,4 +254,56 @@ mod tests {
         let m = find(hay, needle);
         assert!(m.is_some());
     }
+
+    #[test]
+    fn levenshtein_identical_is_zero() {
+        assert_eq!(levenshtein(b"hello", b"hello"), 0);
+    }
+
+    #[test]
+    fn levenshtein_single_deletion() {
+        assert_eq!(levenshtein(b"hello", b"helo"), 1);
+    }
+
+    #[test]
+    fn levenshtein_single_insertion() {
+        assert_eq!(levenshtein(b"cat", b"cart"), 1);
+    }
+
+    #[test]
+    fn levenshtein_single_substitution() {
+        assert_eq!(levenshtein(b"cat", b"bat"), 1);
+    }
+
+    #[test]
+    fn levenshtein_empty_strings() {
+        assert_eq!(levenshtein(b"", b""), 0);
+    }
+
+    #[test]
+    fn levenshtein_full_replacement() {
+        assert_eq!(levenshtein(b"abc", b"xyz"), 3);
+    }
+
+    #[test]
+    fn compute_ratio_identical() {
+        assert_eq!(compute_ratio(b"hello", b"hello"), 1.0);
+    }
+
+    #[test]
+    fn compute_ratio_completely_different() {
+        // For "abc" vs "xyz": distance 3, max_len 3, ratio = 0.0
+        assert!((compute_ratio(b"abc", b"xyz") - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn compute_ratio_empty_both() {
+        assert_eq!(compute_ratio(b"", b""), 1.0);
+    }
+
+    #[test]
+    fn compute_ratio_empty_one() {
+        assert_eq!(compute_ratio(b"", b"test"), 0.0);
+        assert_eq!(compute_ratio(b"test", b""), 0.0);
+    }
 }

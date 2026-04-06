@@ -330,11 +330,16 @@ mod tests {
 
     #[test]
     fn test_confidence_medium() {
+        // Medium: 80%+ pass, no critical failures (TypeCheck/Test), but not 100%
         let results = vec![
             make_result(ValidationKind::TypeCheck, true, 0),
-            make_result(ValidationKind::Test, true, 2), // warnings OK
+            make_result(ValidationKind::Test, true, 0),
+            make_result(ValidationKind::Lint, true, 0),
+            make_result(ValidationKind::Lint, true, 0),
+            make_result(ValidationKind::Lint, false, 0), // 1 non-critical failure
         ];
         let summary = ValidationSummary::from_results(results);
+        // 4/5 = 80% pass rate, 0 critical failures → Medium
         assert_eq!(summary.confidence, Confidence::Medium);
     }
 

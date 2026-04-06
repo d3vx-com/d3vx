@@ -1,5 +1,7 @@
 //! Integration tests for GitHub webhook handling
 
+use crate::pipeline::github::{GitHubEvent, GitHubIntegration, CIStatus};
+use crate::pipeline::phases::Priority;
 
 #[test]
 fn test_issue_opened_to_task() {

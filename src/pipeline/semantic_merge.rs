@@ -446,12 +446,13 @@ mod tests {
 
     #[test]
     fn test_extract_fn_name() {
+        // Function signature lines (without diff prefix, as used internally after trim)
         assert_eq!(
-            SemanticMergeAnalyzer::extract_fn_name("-fn foo(arg: i32) {}"),
+            SemanticMergeAnalyzer::extract_fn_name("fn foo(arg: i32) {}"),
             Some("foo".to_string())
         );
         assert_eq!(
-            SemanticMergeAnalyzer::extract_fn_name("-pub fn bar() -> Result<()>"),
+            SemanticMergeAnalyzer::extract_fn_name("pub fn bar() -> Result<()>"),
             Some("bar".to_string())
         );
     }

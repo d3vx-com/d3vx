@@ -1,9 +1,12 @@
 //! Tests for the history reader module.
 
-use super::*;
 use crate::store::database::Database;
 use crate::store::event::EventStore;
-use crate::store::message::{MessageRecord, MessageRole, MessageStore, NewMessage};
+use crate::store::history::{
+    HistoryBounds, HistoryFilter, HistoryKind, HistoryQuery, HistoryReader, HistoryResult,
+    TranscriptEntry, TranscriptReader, TranscriptRole, TranscriptSummary,
+};
+use crate::store::message::{MessageRole, MessageStore, NewMessage};
 use crate::store::session::{NewSession, SessionStore};
 
 fn create_test_db() -> Database {
@@ -158,7 +161,7 @@ fn test_transcript_entry_preview() {
     };
 
     assert_eq!(entry.preview(100), "This is a short message");
-    assert_eq!(entry.preview(10), "This is a...");
+    assert_eq!(entry.preview(10), "This is a ...");
 
     assert!(entry.is_user());
     assert!(!entry.is_assistant());

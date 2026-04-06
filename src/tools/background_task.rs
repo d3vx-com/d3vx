@@ -319,6 +319,7 @@ impl Tool for TaskStopTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::io::Write;
 
     fn clear_registry() {
@@ -330,6 +331,8 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
+    #[serial]
     async fn task_output_missing_task_id() {
         clear_registry();
         let tool = TaskOutputTool::new();
@@ -340,6 +343,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_output_task_not_found() {
         clear_registry();
         let tool = TaskOutputTool::new();
@@ -352,11 +356,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_output_non_blocking_returns_immediately() {
         clear_registry();
         let tool = TaskOutputTool::new();
 
-        let id = register_background_task("sleep 999", None);
+        let id = register_background_task("d3vx-bg-test-sleep-999-xyz", None);
 
         let result = tool
             .execute(json!({ "task_id": id, "block": false }), &make_ctx())
@@ -368,6 +373,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_output_blocking_reads_completed_task() {
         clear_registry();
         let tool = TaskOutputTool::new();
@@ -390,6 +396,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_output_reads_output_file() {
         clear_registry();
         let tool = TaskOutputTool::new();
@@ -411,12 +418,13 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_output_blocking_times_out() {
         clear_registry();
         let tool = TaskOutputTool::new();
 
         // Register a task that stays running (never completed).
-        let id = register_background_task("sleep 9999", None);
+        let id = register_background_task("d3vx-bg-test-sleep-9999-xyz", None);
 
         let result = tool
             .execute(
@@ -429,6 +437,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_stop_missing_task_id() {
         clear_registry();
         let tool = TaskStopTool::new();
@@ -439,6 +448,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_stop_task_not_found() {
         clear_registry();
         let tool = TaskStopTool::new();
@@ -451,11 +461,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_stop_marks_running_task_as_failed() {
         clear_registry();
         let tool = TaskStopTool::new();
 
-        let id = register_background_task("sleep 999", None);
+        let id = register_background_task("d3vx-bg-test-sleep-999-xyz", None);
 
         let result = tool.execute(json!({ "task_id": &id }), &make_ctx()).await;
         assert!(!result.is_error);
@@ -472,6 +483,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_stop_already_finished_task() {
         clear_registry();
         let tool = TaskStopTool::new();
@@ -485,6 +497,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn register_and_complete_lifecycle() {
         clear_registry();
 
@@ -507,6 +520,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn task_output_block_waits_then_resolves() {
         clear_registry();
         let tool = TaskOutputTool::new();

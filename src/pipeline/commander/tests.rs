@@ -1,6 +1,8 @@
 //! Commander Validation Tests
 
-use super::types::*;
+use super::types::{ValidationCommand, ValidationKind, ValidationResult};
+use super::runner::ValidationRunner;
+use super::runner::parse_output_issues;
 
 #[test]
 fn test_validation_kind_display() {
@@ -42,7 +44,7 @@ fn test_convenience_constructors() {
 
 #[test]
 fn test_default_commands_returns_three() {
-    let cmds = super::runner::ValidationRunner::default_commands();
+    let cmds = ValidationRunner::default_commands();
     assert_eq!(cmds.len(), 3);
     assert_eq!(cmds[0].kind, ValidationKind::TypeCheck);
     assert_eq!(cmds[1].kind, ValidationKind::Test);
@@ -51,31 +53,31 @@ fn test_default_commands_returns_three() {
 
 #[test]
 fn test_all_passed_empty() {
-    assert!(super::runner::ValidationRunner::all_passed(&[]));
+    assert!(ValidationRunner::all_passed(&[]));
 }
 
 #[test]
 fn test_all_passed_true() {
     let results = vec![make_pass_result(), make_pass_result()];
-    assert!(super::runner::ValidationRunner::all_passed(&results));
+    assert!(ValidationRunner::all_passed(&results));
 }
 
 #[test]
 fn test_all_passed_false() {
     let results = vec![make_pass_result(), make_fail_result()];
-    assert!(!super::runner::ValidationRunner::all_passed(&results));
+    assert!(!ValidationRunner::all_passed(&results));
 }
 
 #[test]
 fn test_summarize_empty() {
-    let summary = super::runner::ValidationRunner::summarize(&[]);
+    let summary = ValidationRunner::summarize(&[]);
     assert!(summary.contains("No validation results"));
 }
 
 #[test]
 fn test_summarize_results() {
     let results = vec![make_pass_result(), make_fail_result()];
-    let summary = super::runner::ValidationRunner::summarize(&results);
+    let summary = ValidationRunner::summarize(&results);
     assert!(summary.contains("1/2 passed"));
     assert!(summary.contains("PASS"));
     assert!(summary.contains("FAIL"));

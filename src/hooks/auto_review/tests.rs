@@ -4,7 +4,6 @@ use std::fs;
 use std::io::Write as IoWrite;
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
-use super::checks;
 use super::types::{AutoReviewConfig, ReviewFinding, Severity};
 use super::*;
 

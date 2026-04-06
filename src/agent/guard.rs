@@ -361,13 +361,27 @@ fn determine_risk_level(name: &str) -> RiskLevel {
 impl CommandGuard {
     /// Get the formal permission request for a tool call ID (if tracked).
     pub async fn get_permission_request(&self, tool_call_id: &str) -> Option<PermissionReq> {
+        // Try pending map first, then fall back to PermissionManager by tool call ID
         let pending = self.pending.read().await;
         if let Some(pr) = pending.get(tool_call_id) {
-            if let (Some(perm_id), Some(ref mgr)) = (&pr.permission_id, &self.permission_manager) {
-                return mgr.get(perm_id).await;
+            if let Some(ref mgr) = self.permission_manager {
+                if let Some(perm_id) = &pr.permission_id {
+                    return mgr.get(perm_id).await;
+                }
             }
+            drop(pending);
+            if let Some(mgr) = &self.permission_manager {
+                return mgr.get_by_tool_call(tool_call_id).await;
+            }
+            None
+        } else {
+            // Pending entry was removed (e.g., after decision); check PermissionManager
+            drop(pending);
+            if let Some(mgr) = &self.permission_manager {
+                return mgr.get_by_tool_call(tool_call_id).await;
+            }
+            None
         }
-        None
     }
 
     /// Get all pending permission requests from the manager.
@@ -522,8 +536,8 @@ mod tests {
 
         // Check that permission request was created in the manager
         let perm_req = guard.get_permission_request("perm-test-1").await;
-        assert!(perm_req.is_some(), "Permission request should be created");
-        let perm_req = perm_req.unwrap();
+        assert!(perm_req.is_some_and(|req| req.state == PermissionState::Pending), "Permission request should be created and in Pending state");
+        let perm_req = guard.get_permission_request("perm-test-1").await.unwrap();
         assert_eq!(perm_req.tool_name, "WriteTool");
         assert_eq!(perm_req.session_id, session_id);
 
@@ -638,9 +652,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_guard_decision_updates_permission_manager() {
-        use crate::pipeline::permission::PermissionDecision as FormalDecision;
         use crate::pipeline::permission::PermissionManager;
-        use crate::pipeline::permission::PermissionState;
         use std::sync::Arc;
 
         let config = PermissionsConfig::default();

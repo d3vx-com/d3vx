@@ -5,9 +5,61 @@ use crate::tools::spawn_parallel::{SpawnParallelEvent, SpawnParallelTool, SpawnT
 use crate::tools::{Tool, ToolContext};
 use tokio::sync::mpsc;
 
+/// Helper: spawns a responder task that stores the event and replies on the oneshot.
+fn spawn_responder(
+    mut rx: mpsc::Receiver<SpawnParallelEvent>,
+) -> tokio::sync::oneshot::Receiver<SpawnParallelEvent> {
+    let (event_tx, event_rx) = tokio::sync::oneshot::channel();
+    tokio::spawn(async move {
+        if let Some(mut event) = rx.recv().await {
+            let n = event.tasks.len();
+            let summary = event
+                .tasks
+                .iter()
+                .enumerate()
+                .map(|(i, t)| format!("  {}. {}", i + 1, t.description))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let report = format!(
+                "Compiled Parallel Execution Report (batch: {}):\nSpawning {n} parallel specialist agents:\n{summary}",
+                event.batch_id
+            );
+            let response_tx = std::mem::replace(
+                &mut event.response_tx,
+                tokio::sync::oneshot::channel().0,
+            );
+            let _ = response_tx.send(report);
+            let _ = event_tx.send(event);
+        }
+    });
+    event_rx
+}
+
+/// Helper: spawns a forwarder that forwards events through another channel and replies on the oneshot.
+fn spawn_forwarder(
+    mut rx: mpsc::Receiver<SpawnParallelEvent>,
+) -> (
+    mpsc::Receiver<SpawnParallelEvent>,
+    tokio::task::JoinHandle<()>,
+) {
+    let (forward_tx, forward_rx) = mpsc::channel(32);
+    let handle = tokio::spawn(async move {
+        while let Some(mut event) = rx.recv().await {
+            let response_tx = std::mem::replace(
+                &mut event.response_tx,
+                tokio::sync::oneshot::channel().0,
+            );
+            let _ = response_tx.send("done".to_string());
+            let _ = forward_tx.send(event).await;
+        }
+    });
+    (forward_rx, handle)
+}
+
 #[tokio::test]
 async fn test_spawn_parallel_tool_sends_event() {
-    let (tx, mut rx) = mpsc::channel(32);
+    let (tx, rx) = mpsc::channel(32);
+    let responder = spawn_responder(rx);
     let tool = SpawnParallelTool::with_sender(tx);
 
     let input = serde_json::json!({
@@ -35,17 +87,11 @@ async fn test_spawn_parallel_tool_sends_event() {
     let result = tool.execute(input, &context).await;
 
     // Tool should succeed
-    assert!(
-        !result.is_error,
-        "Tool should not return error: {}",
-        result.content
-    );
-    assert!(result
-        .content
-        .contains("Spawning 3 parallel specialist agents"));
+    assert!(!result.is_error, "Tool should not return error: {}", result.content);
+    assert!(result.content.contains("Spawning 3 parallel specialist agents"));
 
     // Event should be sent
-    let event = rx.try_recv().expect("Event should be sent");
+    let event = responder.await.expect("Event should be sent");
     assert_eq!(event.tasks.len(), 3);
     assert_eq!(event.tasks[0].description, "Backend API");
     assert_eq!(event.tasks[0].agent_type, AgentType::Backend);
@@ -55,16 +101,8 @@ async fn test_spawn_parallel_tool_sends_event() {
 
 #[tokio::test]
 async fn test_spawn_parallel_event_forwarding() {
-    // Simulate the event forwarding loop
-    let (tx, mut rx) = mpsc::channel(32);
-
-    // Spawn the forwarder task (like in App::new)
-    let (forward_tx, mut forward_rx) = mpsc::channel(32);
-    tokio::spawn(async move {
-        while let Some(spawn_event) = rx.recv().await {
-            let _ = forward_tx.send(spawn_event).await;
-        }
-    });
+    let (tx, rx) = mpsc::channel(32);
+    let (mut forward_rx, forwarder) = spawn_forwarder(rx);
 
     // Create and execute tool
     let tool = SpawnParallelTool::with_sender(tx);
@@ -82,6 +120,8 @@ async fn test_spawn_parallel_event_forwarding() {
     // Event should be forwarded
     let event = forward_rx.recv().await.expect("Event should be forwarded");
     assert_eq!(event.tasks.len(), 2);
+
+    forwarder.abort();
 }
 
 #[tokio::test]
@@ -133,7 +173,8 @@ async fn test_spawn_parallel_tool_validation_errors() {
 
 #[tokio::test]
 async fn test_spawn_parallel_default_agent_type() {
-    let (tx, mut rx) = mpsc::channel(32);
+    let (tx, rx) = mpsc::channel(32);
+    let responder = spawn_responder(rx);
     let tool = SpawnParallelTool::with_sender(tx);
 
     // Without agent_type, should default to General
@@ -148,7 +189,7 @@ async fn test_spawn_parallel_default_agent_type() {
     let context = ToolContext::default();
     tool.execute(input, &context).await;
 
-    let event = rx.try_recv().expect("Event should be sent");
+    let event = responder.await.expect("Event should be sent");
     assert_eq!(event.tasks[0].agent_type, AgentType::General);
     assert_eq!(event.tasks[1].agent_type, AgentType::Testing);
 }
@@ -184,7 +225,7 @@ async fn test_spawn_task_struct() {
 
 #[tokio::test]
 async fn test_spawn_parallel_tool_without_sender() {
-    // Tool without sender should still return success (graceful degradation)
+    // Tool without sender uses graceful degradation path (no oneshot await)
     let tool = SpawnParallelTool::new();
     let context = ToolContext::default();
 

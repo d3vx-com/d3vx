@@ -132,4 +132,20 @@ mod tests {
         assert_eq!(m.strategy, Strategy::Normalized);
         assert_eq!(&hay[m.start..m.end], "fn main() {}");
     }
+
+    #[test]
+    fn normalize_collapses_spaces() {
+        assert_eq!(normalize("a  b   c"), "a b c");
+    }
+
+    #[test]
+    fn normalize_trims_each_line() {
+        assert_eq!(normalize("  foo  \n  bar  "), "foo\nbar");
+    }
+
+    #[test]
+    fn normalize_handles_multi_paragraph() {
+        let result = normalize("  hello  world  \n\n  foo  ");
+        assert_eq!(result, "hello world\n\nfoo");
+    }
 }

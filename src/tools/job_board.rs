@@ -427,6 +427,7 @@ impl Tool for HaltJobTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     fn clear_board() {
         JOB_BOARD.write().unwrap().clear();
@@ -437,6 +438,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn create_job_returns_id() {
         clear_board();
         let tool = CreateJobTool::new();
@@ -453,6 +455,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn update_transitions_phase() {
         clear_board();
         let create = CreateJobTool::new();
@@ -478,7 +481,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn list_filters_by_phase() {
+        clear_board();
         clear_board();
         let create = CreateJobTool::new();
         create.execute(json!({ "title": "A" }), &make_ctx()).await;
@@ -495,7 +500,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn get_and_read_output() {
+        clear_board();
         clear_board();
         let create = CreateJobTool::new();
         let created = create
@@ -525,6 +532,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn halt_cancels_active_job() {
         clear_board();
         let create = CreateJobTool::new();
@@ -546,6 +554,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn errors_on_missing_job() {
         clear_board();
         let get = GetJobTool::new();

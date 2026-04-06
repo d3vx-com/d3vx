@@ -30,14 +30,14 @@ pub fn get_pricing(model: &str) -> ModelPricing {
             output: 75.0,
             cache_read: 0.0,
         },
+        m if m.contains("gpt-3.5") || m.contains("gpt-4-mini") || m.contains("gpt-4o-mini") => ModelPricing {
+            input: 0.15,
+            output: 0.60,
+            cache_read: 0.0,
+        },
         m if m.contains("gpt-4o") => ModelPricing {
             input: 5.0,
             output: 15.0,
-            cache_read: 0.0,
-        },
-        m if m.contains("gpt-3.5") || m.contains("gpt-4-mini") => ModelPricing {
-            input: 0.15,
-            output: 0.60,
             cache_read: 0.0,
         },
         _ => ModelPricing {

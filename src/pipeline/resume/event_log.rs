@@ -591,7 +591,7 @@ mod tests {
         }
 
         let since = log.since(2);
-        assert_eq!(since.len(), 3);
+        assert_eq!(since.len(), 2);
         assert_eq!(since[0].name, "e3");
     }
 

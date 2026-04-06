@@ -85,6 +85,9 @@ fn test_task_advance_phase() {
     let mut task = Task::new("TASK-001", "Test", "Test instruction").with_phase(Phase::Research);
 
     assert!(task.advance_phase());
+    assert_eq!(task.phase, Phase::Ideation);
+
+    assert!(task.advance_phase());
     assert_eq!(task.phase, Phase::Plan);
 
     assert!(task.advance_phase());
@@ -261,9 +264,11 @@ fn test_phase_display() {
 fn test_task_serialization_excludes_null_fields() {
     let task = Task::new("T-1", "Test", "Instruction");
     let json = serde_json::to_value(&task).unwrap();
-    // Optional fields should be absent when null/skip_serializing_if
-    assert!(!json.as_object().unwrap()["metadata"].is_object()
-        || json.as_object().unwrap()["metadata"].is_null());
+    // Skip-serialized optional fields are absent; metadata uses skip_serializing_if is_null
+    assert!(
+        json.as_object().unwrap().get("worktree_path").is_none()
+            || json.as_object().unwrap()["worktree_path"].is_null()
+    );
 }
 
 #[test]

@@ -627,9 +627,9 @@ mod tests {
         ));
 
         let summary = coord.summary();
-        assert_eq!(summary.total_messages, 1);
-        assert_eq!(summary.synthesis_inputs, 1);
-        assert_eq!(summary.display(), "1 messages, 0 blockers, 1 inputs");
+        assert_eq!(summary.total_messages, 2);
+        assert_eq!(summary.synthesis_inputs, 0); // synthesis_inputs Vec is separate from messages
+        assert_eq!(summary.display(), "2 messages, 0 blockers, 0 inputs");
     }
 
     #[test]

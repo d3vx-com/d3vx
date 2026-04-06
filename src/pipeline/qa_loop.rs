@@ -1696,7 +1696,7 @@ mod tests {
             review.finalize();
 
             qa.record_review_result(&review, &gate_blocked);
-            let transition = qa.check_and_transition(&gate_blocked);
+            let _transition = qa.check_and_transition(&gate_blocked);
 
             assert_eq!(qa.current_iteration, iteration as u32);
 

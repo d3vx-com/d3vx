@@ -145,7 +145,7 @@ impl Default for ReviewGate {
 
 #[cfg(test)]
 mod tests {
-    use super::super::review_summary::{FindingLocation, ReviewSeverity};
+    use super::super::review_summary::ReviewSeverity;
     use super::*;
 
     fn make_review(status: ReviewStatus) -> ReviewSummary {
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_gate_blocks_critical_finding() {
-        let mut gate = ReviewGate::with_defaults();
+        let gate = ReviewGate::with_defaults();
         let mut review = make_review(ReviewStatus::InProgress);
 
         review.add_finding(make_finding(

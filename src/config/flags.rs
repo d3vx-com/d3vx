@@ -6,6 +6,8 @@ use once_cell::sync::Lazy;
 use std::sync::RwLock;
 use tracing::debug;
 
+pub mod defs;
+
 use super::types::types_features::FeatureFlagsConfig;
 
 static FEATURE_FLAGS: Lazy<RwLock<FeatureFlagsConfig>> =

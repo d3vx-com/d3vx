@@ -296,6 +296,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_ctrl_l_toggles_unified_sidebar() {
         let mut app = test_app().await;
+        // UIState defaults right_sidebar_visible to true; toggle once to start from closed
+        app.ui.right_sidebar_visible = false;
+
         assert!(!app.ui.right_sidebar_visible);
 
         app.handle_key_event(key_mod(KeyCode::Char('l'), KeyModifiers::CONTROL))
@@ -312,6 +315,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_ctrl_r_toggles_right_sidebar() {
         let mut app = test_app().await;
+        // UIState defaults right_sidebar_visible to true; toggle once to start from closed
+        app.ui.right_sidebar_visible = false;
         assert!(!app.ui.right_sidebar_visible);
 
         app.handle_key_event(key_mod(KeyCode::Char('r'), KeyModifiers::CONTROL))

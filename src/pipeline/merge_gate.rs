@@ -584,7 +584,7 @@ impl Default for MergeGate {
 mod tests {
     use super::*;
     use crate::pipeline::docs_completeness::{
-        DocsCompleteness, DocsCompletenessEvaluator, DocsStatus,
+        DocsCompleteness, DocsStatus,
     };
     use crate::pipeline::review_summary::{FindingCategory, ReviewFinding, ReviewSeverity};
     use crate::pipeline::validation_summary::ValidationSummary;

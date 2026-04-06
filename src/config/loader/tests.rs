@@ -1,6 +1,5 @@
 //! Tests for configuration loading
 
-use super::super::types::D3vxConfig;
 use super::api_keys::{get_api_key, get_provider_config};
 use super::loading::load_config;
 use super::merging::{deep_merge, parse_env_value, set_nested_path};
