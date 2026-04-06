@@ -85,15 +85,22 @@ impl App {
                 let env_var = &onboarding.provider_api_key_env;
                 if !env_var.is_empty() {
                     lines.push(Line::from(vec![Span::styled(
-                        format!("  export {}=...", env_var),
+                        format!("  {}=...", env_var),
                         Style::default().fg(dim_color),
                     )]));
                 } else if provider == "ollama" {
                     lines.push(Line::from(vec![Span::styled(
-                        "  ollama.ai - install, then: ollama serve",
+                        "  ollama.ai — install, then: ollama serve",
                         Style::default().fg(dim_color),
                     )]));
                 }
+            }
+
+            if onboarding.needs_api_key_setup {
+                lines.push(Line::from(vec![Span::styled(
+                    "  API key missing — /setup for instructions, or quit & run d3vx setup",
+                    Style::default().fg(error_color),
+                )]));
             }
 
             lines.push(Line::from(vec![

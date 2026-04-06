@@ -57,14 +57,44 @@ pub fn handle_setup(app: &mut App, _args: &[&str]) -> Result<()> {
         return Ok(());
     }
 
-    message.push_str("No API key configured.\n\n");
-
+    // Missing API key — provide actionable guidance
     if let Some(provider) = &onboarding.missing_provider {
-        message.push_str(&format!("Current provider: {}\n\n", provider));
-        message.push_str(&get_setup_instructions(provider));
-        message.push_str("\n─────────────────────────────────────────\n\n");
+        message.push_str("API key is not configured.\n\n");
+        message.push_str(&format!("  Current provider: {}\n", provider));
+        message.push_str(&format!(
+            "  Required environment variable: {}\n\n",
+            onboarding.provider_api_key_env
+        ));
+        message.push_str("Quick fix — set the API key:\n");
+        message.push_str("  1. Get your key from:\n");
+
+        let provider_url = match provider.as_str() {
+            "anthropic" => "https://console.anthropic.com/settings/keys",
+            "openai" => "https://platform.openai.com/api-keys",
+            "groq" => "https://console.groq.com/keys",
+            "openrouter" => "https://openrouter.ai/keys",
+            "xai" => "https://console.x.ai",
+            "mistral" => "https://console.mistral.ai/api-keys",
+            "deepseek" => "https://platform.deepseek.com/api_keys",
+            _ => "your provider's dashboard",
+        };
+        message.push_str(&format!("     {}\n\n", provider_url));
+        message.push_str("  2. Set the environment variable:\n");
+        message.push_str(&format!(
+            "     export {}=\"your-key-here\"\n\n",
+            onboarding.provider_api_key_env
+        ));
+        message.push_str("  3. Restart d3vx\n\n");
+        message.push_str("─────────────────────────────────────────\n\n");
+        message.push_str("Or run full setup from terminal:\n");
+        message.push_str("  Quit d3vx with /quit, then run:\n");
+        message.push_str("  d3vx setup\n");
+
+        app.add_system_message(&message);
+        return Ok(());
     }
 
+    // Fallback — shouldn't reach here if has_api_key is false
     message.push_str("Supported Providers:\n");
     message.push_str(&format_provider_options());
 

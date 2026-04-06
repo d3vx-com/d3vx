@@ -15,6 +15,8 @@ pub struct OnboardingStatus {
     pub has_api_key: bool,
     pub missing_provider: Option<String>,
     pub provider_api_key_env: String,
+    /// Config exists but no API key found — setup is recommended
+    pub needs_api_key_setup: bool,
 }
 
 #[allow(dead_code)]
@@ -42,6 +44,8 @@ pub fn check_onboarding_status() -> OnboardingStatus {
     };
 
     let is_first_run = !has_config && !has_api_key;
+    // Broader check: config exists but API key is not set
+    let needs_api_key_setup = has_config && !has_api_key;
 
     OnboardingStatus {
         is_first_run,
@@ -49,6 +53,7 @@ pub fn check_onboarding_status() -> OnboardingStatus {
         has_api_key,
         missing_provider: if has_api_key { None } else { Some(provider) },
         provider_api_key_env: provider_api_key_env.to_string(),
+        needs_api_key_setup,
     }
 }
 
