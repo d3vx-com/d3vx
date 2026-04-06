@@ -47,12 +47,24 @@ pub fn handle_setup(app: &mut App, _args: &[&str]) -> Result<()> {
     message.push_str("═══════════════════════════════════════\n\n");
 
     if onboarding.has_api_key {
-        message.push_str("API key is configured!\n");
+        message.push_str("API key is configured!\n\n");
         message.push_str(&format!(
-            "  Provider: {}\n\n",
+            "  Current provider: {}\n",
             onboarding.missing_provider.as_deref().unwrap_or("unknown")
         ));
-        message.push_str("To change providers, set a new API key and restart d3vx.\n");
+
+        message.push_str("\nTo change your setup:\n\n");
+        message.push_str("  Change provider/model/base_url:\n");
+        message.push_str("    1. Quit d3vx with /quit\n");
+        message.push_str("    2. Run:  d3vx setup\n");
+        message.push_str("    3. Select a new provider and models\n");
+        message.push_str("    4. If using a proxy, enter the custom base URL\n\n");
+        message.push_str("  Change only the API key:\n");
+        message.push_str("    export <ENV_VAR>=<new-key>\n");
+        message.push_str("    then restart d3vx\n\n");
+        message.push_str("  Change provider without re-run:\n");
+        message.push_str("    Edit ~/.d3vx/config.yml and restart\n");
+
         app.add_system_message(&message);
         return Ok(());
     }
