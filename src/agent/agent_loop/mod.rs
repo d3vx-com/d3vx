@@ -86,14 +86,26 @@ impl AgentLoop {
             paused: Arc::new(RwLock::new(false)),
             state_tracker: {
                 let current_tx = broadcast_tx.clone();
-                AgentStateTracker::new().with_state_change_callback(Arc::new(
+                let session_id_for_cb = session_id.clone();
+                let db_for_cb = config.db.clone();
+                let mut tracker = AgentStateTracker::new().with_state_change_callback(Arc::new(
                     move |old_state, new_state, _reason| {
                         let _ = current_tx.send(AgentEvent::StateChange {
                             old_state,
                             new_state,
                         });
                     },
-                ))
+                ));
+                if let Some(db) = db_for_cb {
+                    let persister_cb = crate::app::session_state_persister::SessionStatePersister
+                        ::callback(session_id_for_cb, db);
+                    tracker = tracker.with_state_change_callback(Arc::new(
+                        move |old_state, new_state, reason| {
+                            persister_cb(old_state, new_state, reason);
+                        },
+                    ));
+                }
+                tracker
             },
             logger: Some(super::logger::JsonlLogger::new(&session_id)),
             recovery_strategy: crate::recovery::EscalationStrategy {
@@ -148,14 +160,26 @@ impl AgentLoop {
             paused: Arc::new(RwLock::new(false)),
             state_tracker: {
                 let current_tx = broadcast_tx.clone();
-                AgentStateTracker::new().with_state_change_callback(Arc::new(
+                let session_id_for_cb = session_id.clone();
+                let db_for_cb = config.db.clone();
+                let mut tracker = AgentStateTracker::new().with_state_change_callback(Arc::new(
                     move |old_state, new_state, _reason| {
                         let _ = current_tx.send(AgentEvent::StateChange {
                             old_state,
                             new_state,
                         });
                     },
-                ))
+                ));
+                if let Some(db) = db_for_cb {
+                    let persister_cb = crate::app::session_state_persister::SessionStatePersister
+                        ::callback(session_id_for_cb, db);
+                    tracker = tracker.with_state_change_callback(Arc::new(
+                        move |old_state, new_state, reason| {
+                            persister_cb(old_state, new_state, reason);
+                        },
+                    ));
+                }
+                tracker
             },
             logger: Some(super::logger::JsonlLogger::new(&session_id)),
             recovery_strategy: crate::recovery::EscalationStrategy {

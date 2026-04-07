@@ -303,6 +303,7 @@ impl App {
         parallel_agents: bool,
         focus_mode: FocusMode,
         permission_manager: Option<Arc<crate::pipeline::permission::PermissionManager>>,
+        db: Option<crate::store::database::DatabaseHandle>,
     ) -> Result<(
         Option<Arc<AgentLoop>>,
         Option<tokio::sync::broadcast::Receiver<AgentEvent>>,
@@ -361,6 +362,7 @@ impl App {
             allow_parallel_spawn: parallel_enabled,
             role: agent_role,
             plan_mode,
+            db: db.clone(),
             ..Default::default()
         };
 

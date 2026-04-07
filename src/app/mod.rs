@@ -33,6 +33,7 @@ pub mod init;
 pub mod inline_agents;
 pub mod parallel_batches;
 pub mod runner;
+pub mod session_state_persister;
 pub mod sessions;
 pub mod slash_commands;
 pub mod state;

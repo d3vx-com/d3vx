@@ -6,7 +6,7 @@
 mod tests;
 mod tests_tracker;
 mod tracker;
-mod types;
+pub mod types;
 
 // Re-export all public types
 pub use tracker::AgentStateTracker;

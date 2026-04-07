@@ -500,6 +500,7 @@ impl App {
                 self.agents.parallel_agents_enabled,
                 self.ui.focus_mode,
                 self.permission_manager.clone(),
+                self.db.clone(),
             )?;
             if let Some(agent) = agent {
                 self.agents

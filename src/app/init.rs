@@ -169,6 +169,7 @@ impl App {
                 true,
                 crate::app::state::FocusMode::Chat,
                 permission_manager,
+                db.clone(),
             )?;
             if let Some(agent) = &agent {
                 let orch = orchestrator.clone();

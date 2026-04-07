@@ -48,6 +48,9 @@ pub struct AgentConfig {
     pub plan_mode: bool,
     /// Skip context compaction for faster sub-agent execution.
     pub skip_compaction: bool,
+    /// Optional database handle for session state persistence.
+    #[serde(skip)]
+    pub db: Option<crate::store::database::DatabaseHandle>,
 }
 
 impl Default for AgentConfig {
@@ -71,6 +74,7 @@ impl Default for AgentConfig {
             thinking_budget: None,
             plan_mode: false,
             skip_compaction: false,
+            db: None,
         }
     }
 }
