@@ -25,6 +25,7 @@ use super::super::timeout::TimeoutManager;
 use super::super::vex_manager::VexManager;
 use super::super::worker_pool::WorkerPool;
 use super::config::OrchestratorConfig;
+use super::reaction_bridge::{ReactionBridge, ReactionOutcome, execute_outcome};
 use crate::agent::{AgentLoop, SubAgentManager};
 
 pub struct PipelineOrchestrator {
@@ -44,6 +45,7 @@ pub struct PipelineOrchestrator {
     pub(crate) vex_manager: Arc<VexManager>,
     pub(crate) subagent_manager: Arc<SubAgentManager>,
     pub(crate) ownership_manager: Arc<OwnershipManager>,
+    pub(crate) reaction_bridge: Arc<ReactionBridge>,
 }
 
 impl PipelineOrchestrator {
@@ -116,6 +118,10 @@ impl PipelineOrchestrator {
             config.subagent.cleanup.clone(),
         );
 
+        let reaction_bridge = Arc::new(ReactionBridge::new(
+            super::super::reaction::ReactionConfig::default(),
+        ));
+
         Ok(Self {
             config,
             engine,
@@ -133,6 +139,7 @@ impl PipelineOrchestrator {
             vex_manager,
             subagent_manager,
             ownership_manager,
+            reaction_bridge,
         })
     }
 
@@ -324,6 +331,41 @@ impl PipelineOrchestrator {
         patch: serde_json::Value,
     ) -> Result<Task> {
         self.queue_manager.patch_task_metadata(task_id, patch).await
+    }
+
+    /// Run reaction engine on pipeline results.
+    ///
+    /// Call this after `dispatch_tasks_parallel` returns. It converts
+    /// failed tasks into `ReactionEvent`s and executes the outcomes
+    /// (re-queue, cancel, escalate, etc.).
+    pub async fn post_process_results(&self, results: &[PipelineRunResult]) {
+        for result in results {
+            if result.success {
+                continue;
+            }
+            let outcome = self.reaction_bridge.on_task_completed(result).await;
+            if !matches!(outcome, ReactionOutcome::NoAction) {
+                execute_outcome(self, &outcome).await;
+            }
+        }
+    }
+
+    /// Re-queue a failed task for another attempt.
+    pub async fn requeue_task(&self, task_id: &str) -> Result<()> {
+        self.queue
+            .update_status(task_id, TaskStatus::Queued)
+            .await
+            .map_err(|e| anyhow::anyhow!("re-queue failed: {}", e))?;
+        Ok(())
+    }
+
+    /// Cancel a task by moving it to failed.
+    pub async fn cancel_task(&self, task_id: &str) -> Result<()> {
+        self.queue
+            .update_status(task_id, TaskStatus::Failed)
+            .await
+            .map_err(|e| anyhow::anyhow!("cancel failed: {}", e))?;
+        Ok(())
     }
 }
 

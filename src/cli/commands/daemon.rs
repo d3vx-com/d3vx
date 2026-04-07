@@ -193,11 +193,16 @@ pub(crate) async fn run_daemon_foreground() -> Result<()> {
         };
         let _ = write_daemon_state(&state);
 
-        if let Err(error) = orchestrator.dispatch_tasks_parallel(max_parallel).await {
-            eprintln!("daemon dispatch failed: {}", error);
-            last_dispatch_error = Some(error.to_string());
-        } else {
-            last_dispatch_error = None;
+        match orchestrator.dispatch_tasks_parallel(max_parallel).await {
+            Ok(results) => {
+                last_dispatch_error = None;
+                // Run reaction engine on failed tasks (re-queue, cancel, escalate).
+                orchestrator.post_process_results(&results).await;
+            }
+            Err(error) => {
+                eprintln!("daemon dispatch failed: {}", error);
+                last_dispatch_error = Some(error.to_string());
+            }
         }
 
         let shutdown = tokio::select! {

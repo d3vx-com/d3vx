@@ -5,9 +5,11 @@
 
 pub mod config;
 pub mod orchestrator;
+pub mod reaction_bridge;
 pub mod trait_impl;
 
 // Re-export all public types for backward compatibility
 pub use config::OrchestratorConfig;
 pub use orchestrator::PipelineOrchestrator;
+pub use reaction_bridge::{ReactionBridge, ReactionOutcome};
 pub use trait_impl::TaskAuthority;
