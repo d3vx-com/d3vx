@@ -200,6 +200,67 @@ impl ReviewPhaseResult {
     }
 }
 
+/// Extract PR number and repository from a GitHub PR URL.
+///
+/// Handles formats like `https://github.com/owner/repo/pull/123`.
+pub fn parse_pr_url(url: &str) -> Option<(String, u64)> {
+    let parts: Vec<&str> = url.split('/').collect();
+    // ...github.com/owner/repo/pull/123
+    if parts.len() >= 7 && parts.contains(&"pull") {
+        let pull_idx = parts.iter().position(|p| *p == "pull")?;
+        let owner = parts.get(pull_idx - 2)?;
+        let repo = parts.get(pull_idx - 1)?;
+        let number: u64 = parts.get(pull_idx + 1)?.parse().ok()?;
+        Some((format!("{}/{}", owner, repo), number))
+    } else {
+        None
+    }
+}
+
+/// Run the CI fix loop only (no review response).
+///
+/// This is the primary entry point for daemon mode: after a PR is created,
+/// monitor CI and log results. Actual fix attempts require agent interaction
+/// which the daemon handles via re-queuing tasks through the reaction engine.
+pub async fn monitor_pr_ci(
+    repository: &str,
+    pr_number: u64,
+) -> PostPrOutcome {
+    let mut workflow = PostPrWorkflow::new(repository.to_string(), pr_number);
+
+    // In daemon mode, we monitor but don't auto-apply fixes ourselves.
+    // The reaction engine handles re-queuing for fix attempts.
+    let ci_result = {
+        let mut ci_loop = CiFixLoop::new(
+            CiFixConfig::default(),
+            repository.to_string(),
+            pr_number,
+        );
+        ci_loop.run(|_failing_checks| {
+            // Signal that we can't auto-fix without an agent.
+            // The reaction engine will pick up the failure and re-queue.
+            false
+        }).await
+    };
+
+    let summary = format!(
+        "PR #{} CI monitor: {} ({} fix attempts)",
+        pr_number,
+        if ci_result.is_green { "green" } else { "not green" },
+        ci_result.fix_attempts,
+    );
+
+    info!("{}", summary);
+
+    PostPrOutcome {
+        ci_green: ci_result.is_green,
+        reviews_addressed: true,
+        ci_fix_attempts: ci_result.fix_attempts,
+        review_attempts: 0,
+        summary,
+    }
+}
+
 /// Emit reaction events for a completed post-PR workflow.
 ///
 /// Called by the daemon after the workflow finishes to feed results
