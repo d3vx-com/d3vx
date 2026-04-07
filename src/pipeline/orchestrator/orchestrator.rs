@@ -341,6 +341,12 @@ impl PipelineOrchestrator {
     pub async fn post_process_results(&self, results: &[PipelineRunResult]) {
         for result in results {
             if result.success {
+                // Notify on successful task completion
+                if let Some(ref config) = self.reaction_bridge.notify_config {
+                    if config.on_task_done {
+                        send_task_notification(config, &result.task.title, "completed", "success");
+                    }
+                }
                 continue;
             }
             let outcome = self.reaction_bridge.on_task_completed(result).await;
@@ -373,4 +379,25 @@ impl Default for PipelineOrchestrator {
     fn default() -> Self {
         unimplemented!("Use ::new()")
     }
+}
+
+/// Fire-and-forget task notification helper.
+fn send_task_notification(
+    config: &crate::config::NotificationsConfig,
+    task_title: &str,
+    status: &str,
+    type_name: &str,
+) {
+    use crate::utils::notify::{self, NotificationOptions};
+    let opts = NotificationOptions {
+        title: format!("d3vx: Task {}", status),
+        body: task_title.to_string(),
+        type_name: type_name.to_string(),
+    };
+    let config = config.clone();
+    tokio::spawn(async move {
+        if let Err(e) = notify::notify(opts, &config).await {
+            warn!("Task notification failed: {}", e);
+        }
+    });
 }

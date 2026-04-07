@@ -11,10 +11,13 @@ use tracing::{info, warn};
 use super::super::engine::PipelineRunResult;
 use super::super::reaction::{ReactionConfig, ReactionEngine, ReactionEvent, ReactionType};
 use super::orchestrator::PipelineOrchestrator;
+use crate::config::NotificationsConfig;
+use crate::utils::notify::{self, NotificationOptions};
 
 /// Bridges the orchestrator's pipeline results into reaction engine events.
 pub struct ReactionBridge {
     engine: Arc<ReactionEngine>,
+    pub(super) notify_config: Option<NotificationsConfig>,
 }
 
 impl ReactionBridge {
@@ -22,6 +25,7 @@ impl ReactionBridge {
     pub fn new(config: ReactionConfig) -> Self {
         Self {
             engine: Arc::new(ReactionEngine::with_config(config)),
+            notify_config: None,
         }
     }
 
@@ -29,7 +33,14 @@ impl ReactionBridge {
     pub fn disabled() -> Self {
         Self {
             engine: Arc::new(ReactionEngine::with_config(ReactionConfig::disabled())),
+            notify_config: None,
         }
+    }
+
+    /// Set the notification config for sending alerts.
+    pub fn with_notify_config(mut self, config: NotificationsConfig) -> Self {
+        self.notify_config = Some(config);
+        self
     }
 
     /// Process a completed pipeline result and react accordingly.
@@ -179,6 +190,28 @@ impl ReactionOutcome {
     }
 }
 
+/// Fire-and-forget notification helper.
+fn send_notification(
+    config: &Option<NotificationsConfig>,
+    title: &str,
+    body: &str,
+    type_name: &str,
+) {
+    let Some(config) = config else { return };
+    let opts = NotificationOptions {
+        title: title.to_string(),
+        body: body.to_string(),
+        type_name: type_name.to_string(),
+    };
+    // Spawn fire-and-forget — notification failure should not block the pipeline.
+    let config = config.clone();
+    tokio::spawn(async move {
+        if let Err(e) = notify::notify(opts, &config).await {
+            warn!("Notification send failed: {}", e);
+        }
+    });
+}
+
 /// Execute the reaction outcome against the orchestrator.
 ///
 /// This is a standalone function (not a method) to keep the bridge
@@ -210,10 +243,21 @@ pub async fn execute_outcome(
         }
         ReactionOutcome::Escalate { reason, .. } => {
             warn!("Escalation requested: {}", reason);
+            send_notification(
+                &orchestrator.reaction_bridge.notify_config,
+                "d3vx: Escalation",
+                reason,
+                "error",
+            );
         }
         ReactionOutcome::Notify { reason, .. } => {
             info!("Notification: {}", reason);
-            // Notification wiring will be added in a separate commit
+            send_notification(
+                &orchestrator.reaction_bridge.notify_config,
+                "d3vx: Attention Needed",
+                reason,
+                "info",
+            );
         }
         ReactionOutcome::NoAction => {}
     }
