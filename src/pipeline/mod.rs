@@ -120,6 +120,7 @@ pub mod orchestrator;
 pub mod ownership;
 pub mod permission;
 pub mod phases;
+pub mod post_pr;
 pub mod pr_ci_loop;
 pub mod pr_lifecycle;
 pub mod prompts;
