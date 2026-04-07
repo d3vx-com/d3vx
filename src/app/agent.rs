@@ -382,7 +382,30 @@ impl App {
             ))
         };
 
-        let (agent, rx) = AgentLoop::with_events(provider, tools, Some(guard), agent_config);
+        let (mut agent, rx) = AgentLoop::with_events(provider, tools, Some(guard), agent_config);
+
+        // Attach LSP bridge if configured
+        if let Some(ref lsp_config) = config.lsp {
+            if lsp_config.enabled {
+                let bridge_configs: Vec<crate::lsp::LspBridgeConfig> = lsp_config
+                    .servers
+                    .values()
+                    .map(|s| crate::lsp::LspBridgeConfig {
+                        binary: s.command.first().cloned().unwrap_or_default(),
+                        args: s.command[1..].to_vec(),
+                        extensions: s.extensions.clone(),
+                    })
+                    .collect();
+                if !bridge_configs.is_empty() {
+                    let root = std::path::PathBuf::from(&working_dir);
+                    agent = agent.with_lsp_bridge(Arc::new(crate::lsp::LspBridge::new(
+                        bridge_configs,
+                        root,
+                    )));
+                }
+            }
+        }
+
         Ok((Some(Arc::new(agent)), Some(rx), None))
     }
 
