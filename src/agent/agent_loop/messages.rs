@@ -1,5 +1,8 @@
 //! Agent loop message management: add, get, compact, set methods.
 
+use tracing::info;
+
+use crate::agent::context::compaction::{needs_compaction, CompactionConfig};
 use crate::providers::{ContentBlock, Message, Role, TokenUsage};
 
 use super::AgentLoop;
@@ -46,6 +49,40 @@ impl AgentLoop {
     pub async fn compact_history(&self, keep_last: usize) -> usize {
         let mut conv = self.conversation.write().await;
         conv.compact(keep_last)
+    }
+
+    /// Auto-compact if the conversation is approaching the context limit.
+    ///
+    /// Uses a 200K token window by default and triggers at 80% usage.
+    /// Keeps the first message (system context) and the 6 most recent messages.
+    pub async fn auto_compact_if_needed(&self) {
+        let config = {
+            let cfg = self.config.read().await;
+            if cfg.skip_compaction {
+                return;
+            }
+            CompactionConfig {
+                max_context_tokens: 200_000,
+                threshold_pct: 0.8,
+                keep_recent: 6,
+                enabled: true,
+            }
+        };
+
+        let should_compact = {
+            let conv = self.conversation.read().await;
+            needs_compaction(&conv, &config)
+        };
+
+        if should_compact {
+            let removed = self.compact_history(config.keep_recent).await;
+            if removed > 0 {
+                info!(
+                    "Auto-compacted conversation: removed {} older messages",
+                    removed
+                );
+            }
+        }
     }
 
     /// Set the system prompt for the next run.

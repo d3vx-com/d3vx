@@ -222,6 +222,9 @@ impl AgentLoop {
                 tool_calls = tool_results.len(),
                 "Iteration completed"
             );
+
+            // Auto-compact if approaching context limit
+            self.auto_compact_if_needed().await;
         }
 
         if iterations >= max_iterations {
