@@ -198,6 +198,8 @@ pub(crate) async fn run_daemon_foreground() -> Result<()> {
                 last_dispatch_error = None;
                 // Run reaction engine on failed tasks (re-queue, cancel, escalate).
                 orchestrator.post_process_results(&results).await;
+                // Refresh all tracked PRs (CI, reviews, mergeability).
+                orchestrator.audit_active_prs().await;
             }
             Err(error) => {
                 eprintln!("daemon dispatch failed: {}", error);

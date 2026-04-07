@@ -221,25 +221,7 @@ impl TaskScheduler {
                         .await
                         {
                             Ok(Some(patch)) => {
-                                // Check if a PR was created — if so, monitor CI
-                                let pr_url = patch
-                                    .get("github_sync")
-                                    .and_then(|v| v.get("pull_request_url"))
-                                    .and_then(|v| v.as_str());
-
-                                if let Some(url) = pr_url {
-                                    if let Some((repo, pr_num)) =
-                                        super::post_pr::parse_pr_url(url)
-                                    {
-                                        info!(
-                                            "PR #{} created in {}, starting CI monitor",
-                                            pr_num, repo
-                                        );
-                                        let _outcome =
-                                            super::post_pr::monitor_pr_ci(&repo, pr_num).await;
-                                    }
-                                }
-
+                                // PR tracking is handled by post_process_results via task metadata
                                 if let Ok(updated_task) =
                                     queue.update_metadata(&task_id, patch).await
                                 {

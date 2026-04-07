@@ -16,6 +16,7 @@ use super::super::intake::TaskIntake;
 use super::super::metrics;
 use super::super::ownership::OwnershipManager;
 use super::super::phases::{PhaseContext, Task, TaskStatus};
+use super::super::pr_lifecycle::{PrLifecycleManager, PrMetadata, PrState};
 use super::super::queue::{QueueStats, TaskQueue};
 use super::super::queue_manager;
 use super::super::recovery_manager;
@@ -46,6 +47,9 @@ pub struct PipelineOrchestrator {
     pub(crate) subagent_manager: Arc<SubAgentManager>,
     pub(crate) ownership_manager: Arc<OwnershipManager>,
     pub(crate) reaction_bridge: Arc<ReactionBridge>,
+    pub(crate) pr_manager: Arc<PrLifecycleManager>,
+    /// PRs currently tracked for lifecycle monitoring (task_id → PrMetadata).
+    pub(crate) tracked_prs: Arc<RwLock<HashMap<String, PrMetadata>>>,
 }
 
 impl PipelineOrchestrator {
@@ -122,6 +126,8 @@ impl PipelineOrchestrator {
             super::super::reaction::ReactionConfig::default(),
         ));
 
+        let pr_manager = Arc::new(PrLifecycleManager::new(config.github.as_ref().and_then(|g| g.repository.clone())));
+
         Ok(Self {
             config,
             engine,
@@ -140,6 +146,8 @@ impl PipelineOrchestrator {
             subagent_manager,
             ownership_manager,
             reaction_bridge,
+            pr_manager,
+            tracked_prs: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -338,8 +346,33 @@ impl PipelineOrchestrator {
     /// Call this after `dispatch_tasks_parallel` returns. It converts
     /// failed tasks into `ReactionEvent`s and executes the outcomes
     /// (re-queue, cancel, escalate, etc.).
+    ///
+    /// Also checks for PR URLs in task metadata and starts tracking
+    /// them for lifecycle monitoring (CI, reviews, mergeability).
     pub async fn post_process_results(&self, results: &[PipelineRunResult]) {
         for result in results {
+            // Check for PR URL in task metadata — track it if found
+            if let Some(pr_url) = result
+                .task
+                .metadata
+                .get("github_sync")
+                .and_then(|v| v.get("pull_request_url"))
+                .and_then(|v| v.as_str())
+            {
+                if let Some((repo, pr_num)) =
+                    super::super::post_pr::parse_pr_url(pr_url)
+                {
+                    let mut metadata = PrMetadata::new(
+                        &format!(".d3vx/worktrees/{}", result.task.id),
+                    );
+                    metadata.pr_number = Some(pr_num);
+                    metadata.url = Some(pr_url.to_string());
+                    metadata.state = PrState::Open;
+                    metadata.title = result.task.title.clone();
+                    self.track_pr(&result.task.id, metadata).await;
+                }
+            }
+
             if result.success {
                 // Notify on successful task completion
                 if let Some(ref config) = self.reaction_bridge.notify_config {
@@ -372,6 +405,101 @@ impl PipelineOrchestrator {
             .await
             .map_err(|e| anyhow::anyhow!("cancel failed: {}", e))?;
         Ok(())
+    }
+
+    /// Track a PR for lifecycle monitoring.
+    ///
+    /// Call this after a PR is created. The daemon loop will periodically
+    /// call `audit_active_prs` to check CI/reviews/mergeability.
+    pub async fn track_pr(&self, task_id: &str, metadata: PrMetadata) {
+        let mut tracked = self.tracked_prs.write().await;
+        info!("Tracking PR for task {}: {:?}", task_id, metadata.state);
+        tracked.insert(task_id.to_string(), metadata);
+    }
+
+    /// Audit all tracked PRs: refresh CI, reviews, mergeability.
+    ///
+    /// Call this from the daemon loop on each tick. For each tracked PR:
+    /// - Refreshes state via `PrLifecycleManager.refresh()`
+    /// - Reacts to state transitions (CI failed → reaction, approved → merge, etc.)
+    /// - Removes PRs that reach terminal states (Merged, Closed)
+    pub async fn audit_active_prs(&self) {
+        let mut tracked = self.tracked_prs.write().await;
+        if tracked.is_empty() {
+            return;
+        }
+
+        let task_ids: Vec<String> = tracked.keys().cloned().collect();
+        for task_id in &task_ids {
+            let Some(metadata) = tracked.get_mut(task_id) else {
+                continue;
+            };
+
+            if metadata.pr_number.is_none() {
+                continue;
+            }
+
+            let old_state = metadata.state;
+
+            if let Err(e) = self.pr_manager.refresh(metadata).await {
+                warn!("PR refresh failed for task {}: {}", task_id, e);
+                continue;
+            }
+
+            if metadata.state != old_state {
+                info!(
+                    "PR for task {} transitioned: {:?} → {:?}",
+                    task_id, old_state, metadata.state
+                );
+                self.handle_pr_state_change(task_id, metadata, old_state).await;
+            }
+
+            // Remove terminal states
+            if matches!(metadata.state, PrState::Merged | PrState::Closed) {
+                tracked.remove(task_id);
+            }
+        }
+    }
+
+    /// Handle PR state transitions by triggering appropriate actions.
+    async fn handle_pr_state_change(
+        &self,
+        task_id: &str,
+        metadata: &PrMetadata,
+        _old_state: PrState,
+    ) {
+        match metadata.state {
+            PrState::CiFailed => {
+                info!("PR CI failed for task {}, emitting reaction event", task_id);
+                let _ = self.requeue_task(task_id).await;
+            }
+            PrState::ChangesRequested => {
+                info!(
+                    "Changes requested on PR for task {}, emitting reaction event",
+                    task_id
+                );
+            }
+            PrState::Mergeable => {
+                info!("PR is mergeable for task {}, attempting merge", task_id);
+                if let Err(e) = self.pr_manager.merge(&mut metadata.clone()).await {
+                    warn!("Auto-merge failed for task {}: {}", task_id, e);
+                }
+            }
+            PrState::Merged => {
+                info!("PR merged for task {}, notifying", task_id);
+                if let Some(ref config) = self.reaction_bridge.notify_config {
+                    if config.on_mergeable {
+                        send_task_notification(
+                            config,
+                            &format!("Task {} — PR merged", task_id),
+                            "merged",
+                            "success",
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 
