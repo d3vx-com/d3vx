@@ -17,7 +17,20 @@ struct RemoteModel {
     #[serde(default)]
     cost: Option<RemoteCost>,
     #[serde(default)]
-    limit: Option<u64>,
+    limit: Option<RemoteLimit>,
+}
+
+/// Token limits from models.dev (context, input, output).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct RemoteLimit {
+    /// Total context window (input + output).
+    context: u64,
+    /// Max input tokens (optional — some models specify this separately).
+    #[serde(default)]
+    input: Option<u64>,
+    /// Max output tokens.
+    #[serde(default)]
+    output: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -159,13 +172,19 @@ impl ModelRegistry {
                     ComplexityTier::Standard
                 };
 
+                let (context_window, max_output_tokens) = model_data
+                    .limit
+                    .as_ref()
+                    .map(|l| (l.context, l.output))
+                    .unwrap_or((32_000, 4_096));
+
                 models.push(ModelInfo {
                     id: format!("{}/{}", provider_id, model_id),
                     name: model_data.name,
                     provider: provider_id.clone(),
                     tier,
-                    context_window: model_data.limit.unwrap_or(32000),
-                    max_output_tokens: 4096, // Fallback
+                    context_window,
+                    max_output_tokens,
                     supports_tool_use: true, // Most modern models do
                     supports_vision: false,  // Hard to detect from this API alone
                     supports_streaming: true,
