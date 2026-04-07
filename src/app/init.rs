@@ -24,6 +24,7 @@ impl App {
         model: Option<String>,
         session_id: Option<String>,
         stream_out: Option<std::path::PathBuf>,
+        resume: bool,
     ) -> Result<Self> {
         let is_standalone = std::env::var("D3VX_TUI_MODE").ok().as_deref() == Some("standalone");
         let config = crate::config::load_config(crate::config::LoadConfigOptions::default())?;
@@ -327,12 +328,47 @@ impl App {
         let _ = app.refresh_workspaces();
         let _ = app.refresh_task_views();
 
-        // Auto-resume most recent session if in standalone mode and no session_id given
-        if is_standalone && app.session.session_id.is_none() {
-            if app.try_auto_resume().await {
-                info!("Auto-resumed most recent session");
-            } else {
-                debug!("No session found for auto-resume");
+        // If --resume flag was passed, open session picker immediately
+        if resume {
+            if let Some(db_handle) = app.db.clone() {
+                let db = db_handle.lock();
+                let store = crate::store::session::SessionStore::from_connection(db.connection());
+                let options = crate::store::session::SessionListOptions {
+                    project_path: app.cwd.clone(),
+                    limit: Some(20),
+                    ..Default::default()
+                };
+                if let Ok(sessions) = store.list(options) {
+                    if sessions.is_empty() {
+                        info!("No previous sessions found for --resume");
+                    } else {
+                        info!("Opening session picker for --resume ({} sessions)", sessions.len());
+                        app.session_picker = Some(crate::ui::widgets::SessionPicker::new(sessions));
+                        app.ui.mode = AppMode::SessionPicker;
+                    }
+                }
+            }
+        }
+
+        // If --resume flag was passed, open session picker immediately
+        if resume && is_standalone {
+            if let Some(db_handle) = app.db.clone() {
+                let db = db_handle.lock();
+                let store = crate::store::session::SessionStore::from_connection(db.connection());
+                let options = crate::store::session::SessionListOptions {
+                    project_path: app.cwd.clone(),
+                    limit: Some(20),
+                    ..Default::default()
+                };
+                if let Ok(sessions) = store.list(options) {
+                    if sessions.is_empty() {
+                        info!("No previous sessions found for --resume");
+                    } else {
+                        info!("Opening session picker for --resume ({} sessions)", sessions.len());
+                        app.session_picker = Some(crate::ui::widgets::SessionPicker::new(sessions));
+                        app.ui.mode = AppMode::SessionPicker;
+                    }
+                }
             }
         }
 

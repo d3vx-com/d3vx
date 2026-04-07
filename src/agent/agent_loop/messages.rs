@@ -76,4 +76,10 @@ impl AgentLoop {
             .and_then(|message| message.as_text())
             .map(|text| text.to_string())
     }
+
+    /// Reset internal counters for a fresh session (used after resume).
+    pub async fn reset_for_resume(&self) {
+        *self.total_usage.write().await = TokenUsage::default();
+        *self.failure_count.write().await = 0;
+    }
 }

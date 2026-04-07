@@ -116,6 +116,12 @@ impl App {
             let mut config = agent.config.write().await;
             config.session_id = session_id.to_string();
             config.working_dir = self.cwd.clone().unwrap_or_else(|| ".".to_string());
+
+            // Reset state tracker so the agent can start fresh (was likely in Done/Idle state)
+            let _ = agent.state_tracker.reset().await;
+
+            // Reset token usage and failure count for a clean session
+            agent.reset_for_resume().await;
         }
 
         // Explicitly drop database connection/lock before using self again

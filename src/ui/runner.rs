@@ -17,9 +17,9 @@ use std::os::unix::io::AsRawFd;
 
 use crate::app::App;
 use crate::config::D3vxConfig;
+use crate::pipeline::dashboard::Dashboard;
 
 /// Options for launching the TUI
-#[derive(Debug, Clone)]
 pub struct TuiOptions {
     pub verbose: bool,
     pub cwd: Option<String>,
@@ -28,6 +28,23 @@ pub struct TuiOptions {
     pub ui_mode: Option<String>,
     pub stream_out: Option<std::path::PathBuf>,
     pub config: Option<D3vxConfig>,
+    pub dashboard: Option<Dashboard>,
+    pub resume: bool,
+}
+
+impl std::fmt::Debug for TuiOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TuiOptions")
+            .field("verbose", &self.verbose)
+            .field("cwd", &self.cwd)
+            .field("model", &self.model)
+            .field("session_id", &self.session_id)
+            .field("ui_mode", &self.ui_mode)
+            .field("stream_out", &self.stream_out)
+            .field("dashboard", &self.dashboard.as_ref().map(|_| "Some(Dashboard)"))
+            .field("resume", &self.resume)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Check if running in IPC mode (stdin is not a terminal)
@@ -64,6 +81,7 @@ async fn run_standalone_mode(opts: TuiOptions) -> Result<()> {
         opts.model.clone(),
         opts.session_id.clone(),
         opts.stream_out.clone(),
+        opts.resume,
     )
     .await?;
     app.apply_initial_ui_mode(opts.ui_mode.as_deref());
@@ -120,6 +138,7 @@ async fn run_ipc_mode(opts: TuiOptions) -> Result<()> {
         opts.model.clone(),
         opts.session_id.clone(),
         opts.stream_out.clone(),
+        opts.resume,
     )
     .await?;
     app.apply_initial_ui_mode(opts.ui_mode.as_deref());

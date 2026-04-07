@@ -9,6 +9,7 @@ use crate::config::{
     defaults::default_config, get_provider_config, load_config,
     onboarding::check_onboarding_status, LoadConfigOptions,
 };
+use crate::pipeline::dashboard::{Dashboard, DashboardConfig};
 use crate::ui::runner::{run_tui, TuiOptions};
 
 use crate::cli::args::Cli;
@@ -66,6 +67,33 @@ async fn handle_auto_setup_if_needed() -> bool {
     }
 }
 
+/// Try to start the dashboard server.
+/// Returns Some(Dashboard) on success, None if it fails (non-fatal).
+fn try_start_dashboard() -> Option<Dashboard> {
+    let db_result = crate::store::Database::open_default()
+        .map_err(|e| tracing::warn!("Dashboard: could not open database: {}", e));
+    let db = match db_result {
+        Ok(db) => std::sync::Arc::new(parking_lot::Mutex::new(db)),
+        Err(_) => return None,
+    };
+
+    let dashboard = Dashboard::new(
+        DashboardConfig { enabled: true, ..Default::default() },
+        db.clone(),
+    );
+
+    let url = dashboard.url();
+    let dashboard_clone = dashboard.clone();
+    tokio::spawn(async move {
+        if let Err(e) = dashboard_clone.serve().await {
+            tracing::warn!("Dashboard server error: {}", e);
+        }
+    });
+
+    println!("  Dashboard available at \x1b[4m{}\x1b[0m", url);
+    Some(dashboard)
+}
+
 fn show_skip_hint() {
     println!("\n  \x1b[90mSkipping setup. You'll need to configure d3vx before use:\x1b[0m");
     if !check_onboarding_status().provider_api_key_env.is_empty() {
@@ -110,6 +138,8 @@ pub(crate) async fn execute_oneshot(query: &str, cli: &Cli) -> Result<()> {
         }
     }
 
+    let dashboard = try_start_dashboard();
+
     let tui_opts = TuiOptions {
         verbose: cli.verbose,
         cwd: cwd_string(&cli.cwd),
@@ -118,6 +148,8 @@ pub(crate) async fn execute_oneshot(query: &str, cli: &Cli) -> Result<()> {
         ui_mode: cli.ui.clone(),
         stream_out: cli.stream_out.clone(),
         config,
+        dashboard,
+        resume: cli.resume,
     };
 
     println!("Processing query: {}", query);
@@ -155,6 +187,8 @@ pub(crate) async fn execute_interactive(cli: &Cli) -> Result<()> {
         }
     }
 
+    let dashboard = try_start_dashboard();
+
     let tui_opts = TuiOptions {
         verbose: cli.verbose,
         cwd: cwd_string(&cli.cwd),
@@ -163,6 +197,8 @@ pub(crate) async fn execute_interactive(cli: &Cli) -> Result<()> {
         ui_mode: cli.ui.clone(),
         stream_out: cli.stream_out.clone(),
         config,
+        dashboard,
+        resume: cli.resume,
     };
 
     run_tui(tui_opts).await
