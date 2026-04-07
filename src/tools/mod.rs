@@ -92,6 +92,7 @@ pub use write::WriteTool;
 
 /// Register all core tools
 pub fn register_core_tools() {
+    use std::sync::Arc;
     register_tool(BashTool::new());
     register_tool(ReadTool::new());
     register_tool(WriteTool::new());
@@ -108,7 +109,10 @@ pub fn register_core_tools() {
     register_tool(ReadInboxTool::new());
     register_tool(CompleteTaskTool::new());
     register_tool(DraftChangeTool::new());
-    register_tool(SkillTool::new());
+
+    // Initialize skill registry and load skills from default paths
+    let skill_registry = Arc::new(crate::skills::SkillRegistry::new());
+    register_tool(SkillTool::new().with_registry(skill_registry));
     register_tool(StructuredOutputTool::new());
     register_tool(BestOfNTool::new());
     register_tool(SpawnParallelTool::new());
