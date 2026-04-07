@@ -1,9 +1,12 @@
 //! Embedded Web Dashboard
 //!
-//! Lightweight HTTP server with SSE real-time updates, compiled into the binary.
-//! Zero external JavaScript framework dependencies — pure inline HTML/CSS/JS.
+//! Axum HTTP server with SSE real-time updates and a React SPA frontend.
+//! The dashboard queries real data from the SQLite store.
+//!
+//! Frontend is built with Vite + React and embedded at compile time.
 
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tokio::sync::broadcast;
 use tracing::{debug, info, warn};
 
@@ -93,30 +96,38 @@ pub enum DashboardError {
 
 const BROADCAST_CAPACITY: usize = 256;
 
-/// Dashboard server that broadcasts events via SSE and serves a REST API.
+/// Dashboard server that broadcasts events via SSE and serves a REST API
+/// backed by the SQLite database.
 #[derive(Clone)]
 pub struct Dashboard {
     config: DashboardConfig,
     tx: broadcast::Sender<DashboardEvent>,
+    db: Arc<parking_lot::Mutex<crate::store::Database>>,
 }
 
 impl Dashboard {
-    /// Create a new dashboard with the given configuration.
-    pub fn new(config: DashboardConfig) -> Self {
+    /// Create a new dashboard with the given configuration and database.
+    pub fn new(config: DashboardConfig, db: Arc<parking_lot::Mutex<crate::store::Database>>) -> Self {
         let (tx, _rx) = broadcast::channel(BROADCAST_CAPACITY);
         info!(
             "Dashboard initialized (host={}, port={}, enabled={})",
             config.host, config.port, config.enabled
         );
-        Self { config, tx }
+        Self { config, tx, db }
     }
 
     /// Create a disabled dashboard (no-op).
     pub fn disabled() -> Self {
-        Self::new(DashboardConfig {
-            enabled: false,
-            ..Default::default()
-        })
+        Self::new(
+            DashboardConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            Arc::new(parking_lot::Mutex::new(
+                crate::store::Database::in_memory()
+                    .expect("Failed to create dummy database"),
+            )),
+        )
     }
 
     /// Broadcast an event to all connected SSE clients.
@@ -164,6 +175,11 @@ impl Dashboard {
         &self.config
     }
 
+    /// Return a reference to the database handle.
+    pub fn db(&self) -> &Arc<parking_lot::Mutex<crate::store::Database>> {
+        &self.db
+    }
+
     /// Start the HTTP server with axum.
     pub async fn serve(&self) -> Result<(), DashboardError> {
         if !self.config.enabled {
@@ -209,6 +225,13 @@ pub fn format_sse_event(event: &DashboardEvent) -> String {
 mod tests {
     use super::*;
 
+    fn test_db() -> Arc<parking_lot::Mutex<crate::store::Database>> {
+        Arc::new(parking_lot::Mutex::new(
+            crate::store::Database::in_memory()
+                .expect("Failed to create test database"),
+        ))
+    }
+
     #[test]
     fn test_dashboard_config_default() {
         let cfg = DashboardConfig::default();
@@ -219,11 +242,14 @@ mod tests {
 
     #[test]
     fn test_dashboard_urls() {
-        let dash = Dashboard::new(DashboardConfig {
-            enabled: true,
-            host: "0.0.0.0".into(),
-            port: 8080,
-        });
+        let dash = Dashboard::new(
+            DashboardConfig {
+                enabled: true,
+                host: "0.0.0.0".into(),
+                port: 8080,
+            },
+            test_db(),
+        );
         assert_eq!(dash.url(), "http://0.0.0.0:8080");
         assert_eq!(dash.sse_url(), "http://0.0.0.0:8080/api/events");
     }
@@ -255,10 +281,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_broadcast_to_subscriber() {
-        let dash = Dashboard::new(DashboardConfig {
-            enabled: true,
-            ..Default::default()
-        });
+        let dash = Dashboard::new(
+            DashboardConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            test_db(),
+        );
         let mut rx = dash.subscribe();
         dash.broadcast(DashboardEvent::TaskCreated {
             id: "T-42".into(),
@@ -276,10 +305,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_broadcast_disabled_drops_event() {
-        let dash = Dashboard::new(DashboardConfig {
-            enabled: false,
-            ..Default::default()
-        });
+        let dash = Dashboard::new(
+            DashboardConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            test_db(),
+        );
         let mut rx = dash.subscribe();
         dash.broadcast(DashboardEvent::TaskCreated {
             id: "T-1".into(),
@@ -290,10 +322,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_client_count() {
-        let dash = Dashboard::new(DashboardConfig {
-            enabled: true,
-            ..Default::default()
-        });
+        let dash = Dashboard::new(
+            DashboardConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            test_db(),
+        );
         assert_eq!(dash.client_count(), 0);
         let _rx1 = dash.subscribe();
         assert_eq!(dash.client_count(), 1);
@@ -335,5 +370,16 @@ mod tests {
             }
             _ => panic!("Expected CostUpdate"),
         }
+    }
+
+    #[test]
+    fn test_db_handle() {
+        let db = test_db();
+        let dash = Dashboard::new(
+            DashboardConfig::default(),
+            db.clone(),
+        );
+        // Verify the handle is the same Arc
+        assert!(Arc::ptr_eq(dash.db(), &db));
     }
 }

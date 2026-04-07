@@ -45,10 +45,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_subscribe_receives_events() {
+        let db = std::sync::Arc::new(parking_lot::Mutex::new(
+            crate::store::Database::in_memory().unwrap(),
+        ));
         let dash = Dashboard::new(DashboardConfig {
             enabled: true,
             ..Default::default()
-        });
+        }, db);
 
         let mut rx = dash.subscribe();
         dash.broadcast(DashboardEvent::TaskCompleted {
