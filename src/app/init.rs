@@ -270,7 +270,10 @@ impl App {
             autonomous_iterations: 0,
 
             symbols: crate::services::SymbolExtractor::new(),
-            memory_search: None, // Initialized later with DB path
+            memory_search: {
+                let db_path = crate::store::database::Database::default_db_path();
+                crate::services::MemorySearch::new(db_path.to_string_lossy().as_ref()).ok()
+            },
             permission_manager: Some(Arc::new(
                 crate::pipeline::permission::PermissionManager::new(),
             )),
