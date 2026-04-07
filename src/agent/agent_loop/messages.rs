@@ -51,22 +51,41 @@ impl AgentLoop {
         conv.compact(keep_last)
     }
 
-    /// Auto-compact if the conversation is approaching the context limit.
+    /// Auto-compact if the conversation is approaching the model's context limit.
     ///
-    /// Uses a 200K token window by default and triggers at 80% usage.
+    /// Queries the provider for the model's actual `context_window`, then triggers
+    /// compaction at 80% usage. Falls back to 200K if the model info is unavailable.
     /// Keeps the first message (system context) and the 6 most recent messages.
     pub async fn auto_compact_if_needed(&self) {
-        let config = {
+        let model = {
             let cfg = self.config.read().await;
             if cfg.skip_compaction {
                 return;
             }
-            CompactionConfig {
-                max_context_tokens: 200_000,
-                threshold_pct: 0.8,
-                keep_recent: 6,
-                enabled: true,
-            }
+            cfg.model.clone()
+        };
+
+        // Resolve the model's actual context window from the provider
+        let context_window = self
+            .provider
+            .model_info(&model)
+            .map(|info| info.context_window)
+            .unwrap_or(200_000);
+
+        let max_output = self
+            .provider
+            .model_info(&model)
+            .map(|info| info.max_output_tokens)
+            .unwrap_or(8_192);
+
+        // Usable context = full window minus reserved output tokens (like opencode)
+        let usable = context_window.saturating_sub(max_output);
+
+        let config = CompactionConfig {
+            max_context_tokens: usable,
+            threshold_pct: 0.8,
+            keep_recent: 6,
+            enabled: true,
         };
 
         let should_compact = {
@@ -78,8 +97,8 @@ impl AgentLoop {
             let removed = self.compact_history(config.keep_recent).await;
             if removed > 0 {
                 info!(
-                    "Auto-compacted conversation: removed {} older messages",
-                    removed
+                    "Auto-compacted conversation: removed {} older messages (context_window={}, usable={})",
+                    removed, context_window, usable
                 );
             }
         }
