@@ -367,6 +367,7 @@ mod tests {
                 task_view_tasks: Vec::new(),
                 task_view_records: Vec::new(),
                 list_selected_task: 0,
+                dashboard: None,
             }
         })
     }

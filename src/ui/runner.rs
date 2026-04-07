@@ -82,6 +82,7 @@ async fn run_standalone_mode(opts: TuiOptions) -> Result<()> {
         opts.session_id.clone(),
         opts.stream_out.clone(),
         opts.resume,
+        opts.dashboard.clone(),
     )
     .await?;
     app.apply_initial_ui_mode(opts.ui_mode.as_deref());
@@ -139,6 +140,7 @@ async fn run_ipc_mode(opts: TuiOptions) -> Result<()> {
         opts.session_id.clone(),
         opts.stream_out.clone(),
         opts.resume,
+        opts.dashboard.clone(),
     )
     .await?;
     app.apply_initial_ui_mode(opts.ui_mode.as_deref());

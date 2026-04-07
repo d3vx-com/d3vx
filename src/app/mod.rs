@@ -26,6 +26,7 @@ use crate::ui::widgets::board::KanbanTask;
 pub mod actions;
 pub mod agent;
 pub mod commands;
+pub mod dashboard_bridge;
 pub mod event_forwarder;
 pub mod handlers;
 pub mod init;
@@ -197,4 +198,8 @@ pub struct App {
     pub list_selected_task: usize,
     /// Transient notifications (toasts)
     pub notifications: Vec<crate::app::state::Notification>,
+
+    // ── Dashboard ───────────────────────────────────────────
+    /// Optional dashboard server for SSE streaming
+    pub dashboard: Option<crate::pipeline::dashboard::Dashboard>,
 }

@@ -25,6 +25,7 @@ impl App {
         session_id: Option<String>,
         stream_out: Option<std::path::PathBuf>,
         resume: bool,
+        dashboard: Option<crate::pipeline::dashboard::Dashboard>,
     ) -> Result<Self> {
         let is_standalone = std::env::var("D3VX_TUI_MODE").ok().as_deref() == Some("standalone");
         let config = crate::config::load_config(crate::config::LoadConfigOptions::default())?;
@@ -187,6 +188,18 @@ impl App {
             workspace_agents.insert("home".to_string(), agent);
         }
         if let Some(events) = agent_events {
+            // Wire dashboard bridge if dashboard is available
+            if let Some(ref dash) = dashboard {
+                let session = session_id
+                    .clone()
+                    .unwrap_or_else(|| "unknown".to_string());
+                let bridge_rx = events.resubscribe();
+                crate::app::dashboard_bridge::DashboardBridge::spawn(
+                    dash.clone(),
+                    bridge_rx,
+                    session,
+                );
+            }
             pending_agent_receivers.insert("home".to_string(), events);
         }
 
@@ -324,34 +337,13 @@ impl App {
             task_view_records: Vec::new(),
             list_selected_task: 0,
             mcp_manager,
+            dashboard,
         };
 
         // Initial data fetch
         let _ = app.refresh_git_status();
         let _ = app.refresh_workspaces();
         let _ = app.refresh_task_views();
-
-        // If --resume flag was passed, open session picker immediately
-        if resume {
-            if let Some(db_handle) = app.db.clone() {
-                let db = db_handle.lock();
-                let store = crate::store::session::SessionStore::from_connection(db.connection());
-                let options = crate::store::session::SessionListOptions {
-                    project_path: app.cwd.clone(),
-                    limit: Some(20),
-                    ..Default::default()
-                };
-                if let Ok(sessions) = store.list(options) {
-                    if sessions.is_empty() {
-                        info!("No previous sessions found for --resume");
-                    } else {
-                        info!("Opening session picker for --resume ({} sessions)", sessions.len());
-                        app.session_picker = Some(crate::ui::widgets::SessionPicker::new(sessions));
-                        app.ui.mode = AppMode::SessionPicker;
-                    }
-                }
-            }
-        }
 
         // If --resume flag was passed, open session picker immediately
         if resume && is_standalone {
