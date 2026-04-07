@@ -60,6 +60,8 @@ pub struct AgentLoop {
     file_change_log: Arc<Mutex<super::file_change_log::FileChangeLog>>,
     /// Optional LSP bridge for fast per-file diagnostics.
     lsp_bridge: Option<Arc<crate::lsp::LspBridge>>,
+    /// Doom loop detector to catch repetitive tool call patterns.
+    doom_detector: std::sync::Mutex<super::doom_loop::DoomLoopDetector>,
 }
 
 impl AgentLoop {
@@ -105,6 +107,7 @@ impl AgentLoop {
             step_controller: Arc::new(Mutex::new(None)),
             file_change_log: Arc::new(Mutex::new(super::file_change_log::FileChangeLog::new())),
             lsp_bridge: None,
+            doom_detector: std::sync::Mutex::new(super::doom_loop::DoomLoopDetector::new()),
         }
     }
 
@@ -168,6 +171,7 @@ impl AgentLoop {
                 crate::agent::file_change_log::FileChangeLog::new(),
             )),
             lsp_bridge: None,
+            doom_detector: std::sync::Mutex::new(super::doom_loop::DoomLoopDetector::new()),
         }
     }
 

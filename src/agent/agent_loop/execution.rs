@@ -179,8 +179,24 @@ impl AgentLoop {
                 .await;
 
             tracing::info!("Executing {} tool calls", pending_tool_calls.len());
-            for (id, name, _) in &pending_tool_calls {
+            for (id, name, input) in &pending_tool_calls {
                 tracing::info!("Executing tool: {} ({})", name, id);
+
+                // Check for doom loop patterns
+                if let Ok(mut detector) = self.doom_detector.lock() {
+                    if let Some(warning) = detector.record(name, input) {
+                        warn!(
+                            "Doom loop detected: tool '{}' repeated {} times. {}",
+                            warning.tool, warning.repeats, warning.suggestion
+                        );
+                        self.emit(AgentEvent::Error {
+                            error: format!(
+                                "Loop detected: {} called {} times. {}",
+                                warning.tool, warning.repeats, warning.suggestion
+                            ),
+                        });
+                    }
+                }
             }
 
             let tool_results = self
