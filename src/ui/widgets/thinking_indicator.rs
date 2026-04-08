@@ -240,7 +240,7 @@ impl ThinkingIndicator {
         let brand_color = self.theme.brand;
 
         // Detect Vex Mode
-        let is_vex_mode = self.text.as_deref() == Some("Vex Mode Active");
+        let is_vex_mode = self.text.as_deref() == Some("Background Task Active");
 
         // Mascot prefix for Vex Mode
         if is_vex_mode {

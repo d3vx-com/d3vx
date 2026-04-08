@@ -28,7 +28,10 @@ async fn spawn_tmux_session(session_name: &str, command: &str) -> Result<()> {
 
     tokio::process::Command::new("sh")
         .arg("-c")
-        .arg(format!("tmux new-session -d -s {} {}", session_name, session_arg))
+        .arg(format!(
+            "tmux new-session -d -s {} {}",
+            session_name, session_arg
+        ))
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -44,10 +47,7 @@ pub async fn run_vex_mode(query: &str, cli: &Cli) -> Result<()> {
     }) {
         Ok(cfg) => cfg,
         Err(e) => {
-            anyhow::bail!(
-                "Failed to load config: {}. Run `d3vx setup` first.",
-                e
-            );
+            anyhow::bail!("Failed to load config: {}. Run `d3vx setup` first.", e);
         }
     };
 
@@ -92,23 +92,25 @@ pub async fn run_vex_mode(query: &str, cli: &Cli) -> Result<()> {
         task_id = %handle.task_id,
         worktree = %worktree,
         session = %session,
-        "Vex task spawned in tmux"
+        "Background task spawned"
     );
 
     println!();
-    println!("  \x1b[1m🚀 Vex task started in tmux\x1b[0m");
+    println!("  \x1b[1mBackground task started\x1b[0m");
     println!();
-    println!("  Task ID:    \x1b[33m{}\x1b[0m", handle.task_id);
-    println!("  Session:    \x1b[36mtmux attach -t {}\x1b[0m", session);
-    println!("  Worktree:   {}", worktree);
+    println!("  \x1b[90mWhat:\x1b[0m  {}", query);
+    println!("  \x1b[90mWhere:\x1b[0m {} (isolated copy)", worktree);
     println!();
-    println!("  \x1b[90mMonitor progress:\x1b[0m");
+    println!("  \x1b[90mThe agent works in isolation. Nothing changes on your\x1b[0m");
+    println!("  \x1b[90mbranch until you review and approve.\x1b[0m");
+    println!();
+    println!("  \x1b[90mMonitor:\x1b[0m");
     println!("    d3vx status              — view task status");
     println!("    open http://localhost:9876  — open dashboard");
-    println!("    tmux attach -t {}         — attach to session", session);
+    println!("    tmux attach -t {}         — watch live output", session);
     println!();
-    println!("  \x1b[90mCancel task:\x1b[0m");
-    println!("    tmux kill-session -t {}   — cancel and cleanup", session);
+    println!("  \x1b[90mCancel:\x1b[0m");
+    println!("    tmux kill-session -t {}", session);
     println!();
 
     Ok(())
@@ -129,10 +131,14 @@ pub async fn run_task_detached(task_id: String, cwd: String, worktree: String) -
     let orchestrator = PipelineOrchestrator::new(orch_config, Some(db.clone())).await?;
     let queue = orchestrator.queue();
 
-    let task = queue.get_task(&task_id).await
+    let task = queue
+        .get_task(&task_id)
+        .await
         .ok_or_else(|| anyhow::anyhow!("Task {} not found in queue", task_id))?;
 
-    queue.update_status(&task_id, TaskStatus::InProgress).await?;
+    queue
+        .update_status(&task_id, TaskStatus::InProgress)
+        .await?;
 
     let config = load_config(LoadConfigOptions::default())
         .map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
@@ -145,13 +151,18 @@ pub async fn run_task_detached(task_id: String, cwd: String, worktree: String) -
     let agent = tools::create_vex_agent(&config, provider, tools, &cwd, &task_id, db_handle)?;
 
     let worktree_pool = Arc::new(WorkerPool::with_defaults());
-    let lease = worktree_pool.acquire_worker(&task_id).await
+    let lease = worktree_pool
+        .acquire_worker(&task_id)
+        .await
         .map_err(|e| anyhow::anyhow!(e))?;
     let _guard = ExecutionGuard::new(worktree_pool.clone(), task_id.clone(), lease);
 
     let context = PhaseContext::new(task.clone(), &cwd, &worktree);
 
-    let result = orchestrator.engine().run_with_agent(task.clone(), context, Arc::new(agent)).await
+    let result = orchestrator
+        .engine()
+        .run_with_agent(task.clone(), context, Arc::new(agent))
+        .await
         .map_err(|e| anyhow::anyhow!("Task execution failed: {}", e))?;
 
     if result.success {

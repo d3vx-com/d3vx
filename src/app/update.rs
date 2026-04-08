@@ -121,10 +121,10 @@ impl App {
         if !self.background_active_tasks.is_empty() {
             if !self.session.thinking.is_thinking {
                 self.session.thinking.is_thinking = true;
-                self.session.thinking.text = "Vex Mode Active".to_string();
+                self.session.thinking.text = "Background Task Active".to_string();
                 self.session.thinking_start = Some(Instant::now());
             }
-        } else if self.session.thinking.text == "Vex Mode Active"
+        } else if self.session.thinking.text == "Background Task Active"
             && self.agents.streaming_message.is_empty()
         {
             self.session.thinking = crate::ipc::ThinkingState::default();
