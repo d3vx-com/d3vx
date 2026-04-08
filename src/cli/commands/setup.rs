@@ -113,6 +113,21 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
     // Custom base URL for proxies (OpenAI-compatible, LiteLLM, etc.)
     let base_url = prompt_base_url(provider_info.base_url)?;
 
+    // Budget configuration for cost control
+    let budget_enabled = prompt_yes_no("Enable budget enforcement (prevents runaway API costs)", true)?;
+    let budget_per_session = if budget_enabled {
+        let input = prompt_input("Per-session budget (USD)", Some("5.00"))?;
+        input.parse::<f64>().unwrap_or(5.00)
+    } else {
+        0.0
+    };
+    let budget_per_day = if budget_enabled {
+        let input = prompt_input("Per-day budget (USD)", Some("50.00"))?;
+        input.parse::<f64>().unwrap_or(50.00)
+    } else {
+        0.0
+    };
+
     let yaml = render_config_yaml(
         &selected_id,
         &standard_model,
@@ -120,6 +135,9 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
         &cheap_model,
         &premium_model,
         base_url.as_deref(),
+        budget_enabled,
+        budget_per_session,
+        budget_per_day,
     )?;
 
     println!("\n  Planned config:\n\n{yaml}");
@@ -204,6 +222,9 @@ fn render_config_yaml(
     cheap_model: &str,
     premium_model: &str,
     base_url: Option<&str>,
+    budget_enabled: bool,
+    budget_per_session: f64,
+    budget_per_day: f64,
 ) -> Result<String> {
     let mut root = serde_yaml::Mapping::new();
     let sv = |s: &str| serde_yaml::Value::String(s.to_string());
@@ -238,6 +259,17 @@ fn render_config_yaml(
         routing.insert(sv("standard_model"), sv(standard_model));
         routing.insert(sv("premium_model"), sv(premium_model));
         root.insert(sv("model_routing"), serde_yaml::Value::Mapping(routing));
+    }
+
+    // Budget configuration
+    if budget_enabled {
+        let mut budget = serde_yaml::Mapping::new();
+        budget.insert(sv("enabled"), bv(true));
+        budget.insert(sv("per_session"), sv(&format!("{:.2}", budget_per_session)));
+        budget.insert(sv("per_day"), sv(&format!("{:.2}", budget_per_day)));
+        budget.insert(sv("warn_at"), sv("0.8"));
+        budget.insert(sv("pause_at"), sv("1.0"));
+        root.insert(sv("budget"), serde_yaml::Value::Mapping(budget));
     }
 
     serde_yaml::to_string(&serde_yaml::Value::Mapping(root))
