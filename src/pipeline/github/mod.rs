@@ -8,6 +8,7 @@ mod api;
 mod git_ops;
 mod polling;
 mod sync;
+#[cfg(test)]
 mod tests;
 mod types;
 mod utils;

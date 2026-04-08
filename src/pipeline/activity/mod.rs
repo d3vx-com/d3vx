@@ -3,6 +3,7 @@
 //! Tracks agent activity states: active, idle, stuck, blocked, waiting_input.
 //! Detects patterns that indicate the agent needs intervention.
 
+#[cfg(test)]
 pub mod tests;
 pub mod tracker;
 pub mod types;

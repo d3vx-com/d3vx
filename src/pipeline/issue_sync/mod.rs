@@ -3,6 +3,7 @@
 //! Bidirectional sync between GitHub/Linear issues and d3vx tasks.
 //! GitHub operations use the `gh` CLI; Linear is a future stub.
 
+#[cfg(test)]
 pub mod tests;
 pub mod tracker;
 pub mod types;

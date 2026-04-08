@@ -4,6 +4,7 @@
 //! commands in parallel and report structured results back.
 
 pub mod runner;
+#[cfg(test)]
 pub mod tests;
 pub mod types;
 

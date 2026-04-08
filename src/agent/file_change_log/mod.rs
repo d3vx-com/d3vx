@@ -3,6 +3,7 @@
 //! Tracks file modifications made by agent tools (Write, Edit, MultiEdit)
 //! so that the undo picker can revert both conversation history AND file changes.
 
+#[cfg(test)]
 mod tests;
 
 use std::collections::{HashMap, HashSet};
