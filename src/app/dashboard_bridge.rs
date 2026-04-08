@@ -36,10 +36,7 @@ impl DashboardBridge {
         mut rx: broadcast::Receiver<AgentEvent>,
         session_id: &str,
     ) {
-        debug!(
-            session_id,
-            "Dashboard bridge started for session"
-        );
+        debug!(session_id, "Dashboard bridge started for session");
 
         loop {
             match rx.recv().await {
@@ -49,18 +46,11 @@ impl DashboardBridge {
                     }
                 }
                 Err(broadcast::error::RecvError::Closed) => {
-                    debug!(
-                        session_id,
-                        "Dashboard bridge: agent channel closed"
-                    );
+                    debug!(session_id, "Dashboard bridge: agent channel closed");
                     break;
                 }
                 Err(broadcast::error::RecvError::Lagged(n)) => {
-                    warn!(
-                        session_id,
-                        lagged = n,
-                        "Dashboard bridge: lagged, skipping"
-                    );
+                    warn!(session_id, lagged = n, "Dashboard bridge: lagged, skipping");
                     continue;
                 }
             }
@@ -92,9 +82,7 @@ impl DashboardBridge {
                 state: format!("tool: {}", name),
             }),
 
-            AgentEvent::ToolEnd {
-                name, is_error, ..
-            } => Some(DashboardEvent::AgentActivity {
+            AgentEvent::ToolEnd { name, is_error, .. } => Some(DashboardEvent::AgentActivity {
                 task_id: session_id.to_string(),
                 state: if is_error {
                     format!("tool_error: {}", name)
@@ -123,34 +111,29 @@ impl DashboardBridge {
                 ),
             }),
 
-            AgentEvent::IterationEnd { iteration, usage } => {
-                Some(DashboardEvent::CostUpdate {
-                    task_id: session_id.to_string(),
-                    cost_usd: 0.0,
-                    tokens: usage.total(),
-                })
-            }
+            AgentEvent::IterationEnd {
+                iteration: _,
+                usage,
+            } => Some(DashboardEvent::CostUpdate {
+                task_id: session_id.to_string(),
+                cost_usd: 0.0,
+                tokens: usage.total(),
+            }),
 
-            AgentEvent::StateChange { new_state, .. } => {
-                Some(DashboardEvent::AgentActivity {
-                    task_id: session_id.to_string(),
-                    state: format!("state: {:?}", new_state),
-                })
-            }
+            AgentEvent::StateChange { new_state, .. } => Some(DashboardEvent::AgentActivity {
+                task_id: session_id.to_string(),
+                state: format!("state: {:?}", new_state),
+            }),
 
-            AgentEvent::WaitingApproval { name, .. } => {
-                Some(DashboardEvent::AgentActivity {
-                    task_id: session_id.to_string(),
-                    state: format!("waiting_approval: {}", name),
-                })
-            }
+            AgentEvent::WaitingApproval { name, .. } => Some(DashboardEvent::AgentActivity {
+                task_id: session_id.to_string(),
+                state: format!("waiting_approval: {}", name),
+            }),
 
-            AgentEvent::SubAgentSpawn { task } => {
-                Some(DashboardEvent::AgentActivity {
-                    task_id: session_id.to_string(),
-                    state: format!("spawn_subagent: {}", truncate(&task, 100)),
-                })
-            }
+            AgentEvent::SubAgentSpawn { task } => Some(DashboardEvent::AgentActivity {
+                task_id: session_id.to_string(),
+                state: format!("spawn_subagent: {}", truncate(&task, 100)),
+            }),
 
             // Events not useful for dashboard
             AgentEvent::ToolInput { .. }
@@ -275,9 +258,7 @@ mod tests {
         assert!(result.is_some());
         match result.unwrap() {
             DashboardEvent::CostUpdate {
-                task_id,
-                tokens,
-                ..
+                task_id, tokens, ..
             } => {
                 assert_eq!(task_id, "sess-1");
                 assert_eq!(tokens, 500);

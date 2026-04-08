@@ -26,7 +26,7 @@ use super::super::timeout::TimeoutManager;
 use super::super::vex_manager::VexManager;
 use super::super::worker_pool::WorkerPool;
 use super::config::OrchestratorConfig;
-use super::reaction_bridge::{ReactionBridge, ReactionOutcome, execute_outcome};
+use super::reaction_bridge::{execute_outcome, ReactionBridge, ReactionOutcome};
 use crate::agent::{AgentLoop, SubAgentManager};
 
 pub struct PipelineOrchestrator {
@@ -126,7 +126,9 @@ impl PipelineOrchestrator {
             super::super::reaction::ReactionConfig::default(),
         ));
 
-        let pr_manager = Arc::new(PrLifecycleManager::new(config.github.as_ref().and_then(|g| g.repository.clone())));
+        let pr_manager = Arc::new(PrLifecycleManager::new(
+            config.github.as_ref().and_then(|g| g.repository.clone()),
+        ));
 
         Ok(Self {
             config,
@@ -359,12 +361,9 @@ impl PipelineOrchestrator {
                 .and_then(|v| v.get("pull_request_url"))
                 .and_then(|v| v.as_str())
             {
-                if let Some((repo, pr_num)) =
-                    super::super::post_pr::parse_pr_url(pr_url)
-                {
-                    let mut metadata = PrMetadata::new(
-                        &format!(".d3vx/worktrees/{}", result.task.id),
-                    );
+                if let Some((_repo, pr_num)) = super::super::post_pr::parse_pr_url(pr_url) {
+                    let mut metadata =
+                        PrMetadata::new(&format!(".d3vx/worktrees/{}", result.task.id));
                     metadata.pr_number = Some(pr_num);
                     metadata.url = Some(pr_url.to_string());
                     metadata.state = PrState::Open;
@@ -451,7 +450,8 @@ impl PipelineOrchestrator {
                     "PR for task {} transitioned: {:?} → {:?}",
                     task_id, old_state, metadata.state
                 );
-                self.handle_pr_state_change(task_id, metadata, old_state).await;
+                self.handle_pr_state_change(task_id, metadata, old_state)
+                    .await;
             }
 
             // Remove terminal states

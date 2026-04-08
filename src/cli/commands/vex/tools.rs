@@ -4,32 +4,60 @@
 
 use std::sync::Arc;
 
-use crate::agent::{AgentLoop, AgentConfig};
-use crate::agent::tool_coordinator::ToolCoordinator;
-use crate::config::{D3vxConfig, LoadConfigOptions};
-use crate::providers::Provider;
-use crate::agent::prompt::Role;
 use crate::agent::prompt;
+use crate::agent::prompt::Role;
+use crate::agent::tool_coordinator::ToolCoordinator;
+use crate::agent::{AgentConfig, AgentLoop};
+use crate::config::D3vxConfig;
+use crate::providers::Provider;
 use crate::tools::AgentRole;
 
 /// Build a ToolCoordinator with core tools for vex agents.
 pub async fn build_vex_tools() -> Arc<ToolCoordinator> {
     let coordinator = Arc::new(ToolCoordinator::new());
 
-    coordinator.register_tool(crate::tools::BashTool::new()).await;
-    coordinator.register_tool(crate::tools::ReadTool::new()).await;
-    coordinator.register_tool(crate::tools::WriteTool::new()).await;
-    coordinator.register_tool(crate::tools::EditTool::new()).await;
-    coordinator.register_tool(crate::tools::GlobTool::new()).await;
-    coordinator.register_tool(crate::tools::GrepTool::new()).await;
-    coordinator.register_tool(crate::tools::ThinkTool::new()).await;
-    coordinator.register_tool(crate::tools::WebFetchTool::new()).await;
-    coordinator.register_tool(crate::tools::WebSearchTool::new()).await;
-    coordinator.register_tool(crate::tools::TodoWriteTool::new()).await;
-    coordinator.register_tool(crate::tools::CompleteTaskTool::new()).await;
-    coordinator.register_tool(crate::tools::TaskOutputTool::new()).await;
-    coordinator.register_tool(crate::tools::TaskStopTool::new()).await;
-    coordinator.register_tool(crate::tools::MultiEditTool::new()).await;
+    coordinator
+        .register_tool(crate::tools::BashTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::ReadTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::WriteTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::EditTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::GlobTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::GrepTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::ThinkTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::WebFetchTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::WebSearchTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::TodoWriteTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::CompleteTaskTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::TaskOutputTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::TaskStopTool::new())
+        .await;
+    coordinator
+        .register_tool(crate::tools::MultiEditTool::new())
+        .await;
 
     coordinator
 }
@@ -64,5 +92,10 @@ pub fn create_vex_agent(
         session_id.to_string(),
     );
 
-    Ok(AgentLoop::new(provider, tools, Some(Arc::new(guard)), agent_config))
+    Ok(AgentLoop::new(
+        provider,
+        tools,
+        Some(Arc::new(guard)),
+        agent_config,
+    ))
 }

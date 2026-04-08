@@ -96,16 +96,6 @@ impl App {
                 let project_path = self.cwd.as_deref().unwrap_or(".");
                 let vex_agents = crate::app::vex_agent_poller::poll_vex_agents(db, project_path);
 
-                // Find the index of vex agents in inline_agents
-                // Vex agents have IDs starting with "vex:"
-                let existing_vex: Vec<_> = self
-                    .agents
-                    .inline_agents
-                    .iter()
-                    .filter(|a| a.id.starts_with("vex:"))
-                    .cloned()
-                    .collect();
-
                 // Update or add vex agents
                 for vex_agent in vex_agents {
                     let existing = self

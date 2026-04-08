@@ -14,10 +14,10 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
-use super::static_assets;
 use super::sse;
+use super::static_assets;
 use super::types::{BudgetInfo, ModelCost, SessionDetailResponse, SystemStats, TaskRow};
 use super::Dashboard;
 
@@ -73,10 +73,7 @@ async fn list_tasks(State(dashboard): State<Dashboard>) -> Response {
 }
 
 /// GET /api/tasks/:id — get detailed task info.
-async fn get_task(
-    State(dashboard): State<Dashboard>,
-    Path(task_id): Path<String>,
-) -> Response {
+async fn get_task(State(dashboard): State<Dashboard>, Path(task_id): Path<String>) -> Response {
     let db = dashboard.db();
     let db_lock = db.lock();
 
@@ -359,13 +356,19 @@ fn extract_cost_usd(json: &str) -> Option<f64> {
 }
 
 fn parse_duration_secs(start: &str, end: &str) -> u64 {
-    let Ok(s) = chrono::DateTime::parse_from_rfc3339(start) else { return 0 };
-    let Ok(e) = chrono::DateTime::parse_from_rfc3339(end) else { return 0 };
+    let Ok(s) = chrono::DateTime::parse_from_rfc3339(start) else {
+        return 0;
+    };
+    let Ok(e) = chrono::DateTime::parse_from_rfc3339(end) else {
+        return 0;
+    };
     (e.timestamp() - s.timestamp()).max(0) as u64
 }
 
 fn parse_duration_secs_since(start: &str) -> u64 {
-    let Ok(s) = chrono::DateTime::parse_from_rfc3339(start) else { return 0 };
+    let Ok(s) = chrono::DateTime::parse_from_rfc3339(start) else {
+        return 0;
+    };
     (chrono::Utc::now().timestamp() - s.timestamp()).max(0) as u64
 }
 
@@ -385,7 +388,10 @@ mod tests {
 
     fn test_dashboard() -> Dashboard {
         Dashboard::new(
-            DashboardConfig { enabled: true, ..Default::default() },
+            DashboardConfig {
+                enabled: true,
+                ..Default::default()
+            },
             Arc::new(parking_lot::Mutex::new(Database::in_memory().unwrap())),
         )
     }
@@ -394,7 +400,12 @@ mod tests {
     async fn test_list_returns_ok() {
         let app = create_router(test_dashboard());
         let resp = app
-            .oneshot(Request::builder().uri("/api/tasks").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/tasks")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -404,7 +415,12 @@ mod tests {
     async fn test_stats_returns_ok() {
         let app = create_router(test_dashboard());
         let resp = app
-            .oneshot(Request::builder().uri("/api/stats").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/stats")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);

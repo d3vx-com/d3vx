@@ -39,7 +39,7 @@ pub fn handle_doctor(app: &mut App, _args: &[&str]) -> Result<()> {
 }
 
 pub fn handle_setup(app: &mut App, _args: &[&str]) -> Result<()> {
-    use crate::config::{check_onboarding_status, format_provider_options, get_setup_instructions};
+    use crate::config::{check_onboarding_status, format_provider_options};
 
     let onboarding = check_onboarding_status();
 

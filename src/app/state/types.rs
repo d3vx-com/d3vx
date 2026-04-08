@@ -175,9 +175,6 @@ pub struct Notification {
     pub duration: std::time::Duration,
 }
 
-// Re-export inline agent types from the dedicated module
-pub use super::inline_agent::*;
-
 #[cfg(test)]
 mod tests {
     use super::*;

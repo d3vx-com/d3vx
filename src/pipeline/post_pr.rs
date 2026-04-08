@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use tracing::{info, warn};
 
-use super::pr_ci_loop::{CiFixConfig, CiFixLoop};
-use super::review_response::ReviewResponseLoop;
-use super::reaction::{ReactionEvent, ReactionType};
 use super::orchestrator::reaction_bridge::ReactionBridge;
+use super::pr_ci_loop::{CiFixConfig, CiFixLoop};
+use super::reaction::ReactionEvent;
+use super::review_response::ReviewResponseLoop;
 
 /// Result of the full post-PR workflow.
 #[derive(Debug)]
@@ -91,7 +91,8 @@ impl PostPrWorkflow {
 
         // Phase 2: Review response loop (only if CI is green)
         let review_result = if ci_result.is_green {
-            self.run_review_response(on_review_feedback, push_changes).await
+            self.run_review_response(on_review_feedback, push_changes)
+                .await
         } else {
             info!("Skipping review response — CI not green");
             ReviewPhaseResult::skipped()
@@ -100,9 +101,17 @@ impl PostPrWorkflow {
         let summary = format!(
             "PR #{}: CI {} ({} fix attempts), Reviews {} ({} attempts)",
             self.pr_number,
-            if ci_result.is_green { "green" } else { "failed" },
+            if ci_result.is_green {
+                "green"
+            } else {
+                "failed"
+            },
             ci_result.fix_attempts,
-            if review_result.addressed { "addressed" } else { "pending" },
+            if review_result.addressed {
+                "addressed"
+            } else {
+                "pending"
+            },
             review_result.attempts,
         );
 
@@ -136,16 +145,16 @@ impl PostPrWorkflow {
         on_feedback: impl Fn(&[super::review_response::ActionableFeedback]) -> bool,
         push_changes: impl Fn() -> anyhow::Result<()>,
     ) -> ReviewPhaseResult {
-        let mut review_loop = ReviewResponseLoop::new(
-            self.repository.clone(),
-            self.pr_number,
-        )
-        .with_max_attempts(self.max_review_attempts);
+        let mut review_loop = ReviewResponseLoop::new(self.repository.clone(), self.pr_number)
+            .with_max_attempts(self.max_review_attempts);
 
         let report = match review_loop.fetch_review_report().await {
             Ok(r) => r,
             Err(e) => {
-                warn!("Failed to fetch review report for PR #{}: {}", self.pr_number, e);
+                warn!(
+                    "Failed to fetch review report for PR #{}: {}",
+                    self.pr_number, e
+                );
                 return ReviewPhaseResult::skipped();
             }
         };
@@ -190,13 +199,22 @@ struct ReviewPhaseResult {
 
 impl ReviewPhaseResult {
     fn addressed(attempts: u32) -> Self {
-        Self { addressed: true, attempts }
+        Self {
+            addressed: true,
+            attempts,
+        }
     }
     fn skipped() -> Self {
-        Self { addressed: true, attempts: 0 }
+        Self {
+            addressed: true,
+            attempts: 0,
+        }
     }
     fn failed(attempts: u32, _reason: String) -> Self {
-        Self { addressed: false, attempts }
+        Self {
+            addressed: false,
+            attempts,
+        }
     }
 }
 
@@ -222,31 +240,30 @@ pub fn parse_pr_url(url: &str) -> Option<(String, u64)> {
 /// This is the primary entry point for daemon mode: after a PR is created,
 /// monitor CI and log results. Actual fix attempts require agent interaction
 /// which the daemon handles via re-queuing tasks through the reaction engine.
-pub async fn monitor_pr_ci(
-    repository: &str,
-    pr_number: u64,
-) -> PostPrOutcome {
-    let mut workflow = PostPrWorkflow::new(repository.to_string(), pr_number);
+pub async fn monitor_pr_ci(repository: &str, pr_number: u64) -> PostPrOutcome {
+    let _workflow = PostPrWorkflow::new(repository.to_string(), pr_number);
 
     // In daemon mode, we monitor but don't auto-apply fixes ourselves.
     // The reaction engine handles re-queuing for fix attempts.
     let ci_result = {
-        let mut ci_loop = CiFixLoop::new(
-            CiFixConfig::default(),
-            repository.to_string(),
-            pr_number,
-        );
-        ci_loop.run(|_failing_checks| {
-            // Signal that we can't auto-fix without an agent.
-            // The reaction engine will pick up the failure and re-queue.
-            false
-        }).await
+        let mut ci_loop = CiFixLoop::new(CiFixConfig::default(), repository.to_string(), pr_number);
+        ci_loop
+            .run(|_failing_checks| {
+                // Signal that we can't auto-fix without an agent.
+                // The reaction engine will pick up the failure and re-queue.
+                false
+            })
+            .await
     };
 
     let summary = format!(
         "PR #{} CI monitor: {} ({} fix attempts)",
         pr_number,
-        if ci_result.is_green { "green" } else { "not green" },
+        if ci_result.is_green {
+            "green"
+        } else {
+            "not green"
+        },
         ci_result.fix_attempts,
     );
 
