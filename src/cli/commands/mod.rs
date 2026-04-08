@@ -12,6 +12,7 @@ mod oneshot;
 mod setup;
 mod status;
 mod stubs;
+pub mod vex;
 mod worktree;
 
 // Re-export types needed by other modules
@@ -36,8 +37,15 @@ pub async fn execute(cli: Cli) -> Result<()> {
     match &cli.command {
         Some(cmd) => execute_command(cmd, &cli).await,
         None => {
-            // No subcommand - run interactive chat or one-shot query
-            if let Some(query) = &cli.query {
+            // No subcommand - check for --vex flag first
+            if cli.vex {
+                if let Some(query) = &cli.query {
+                    // Vex mode: run in background with parallel agents
+                    vex::run_vex_mode(query, &cli).await
+                } else {
+                    anyhow::bail!("--vex requires a task description. Usage: d3vx --vex \"task description\"");
+                }
+            } else if let Some(query) = &cli.query {
                 oneshot::execute_oneshot(query, &cli).await
             } else {
                 oneshot::execute_interactive(&cli).await

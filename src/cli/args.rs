@@ -52,6 +52,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub parallel_agents: bool,
 
+    /// Run task in Vex mode (background, isolated worktree, autonomous)
+    #[arg(long, global = true)]
+    pub vex: bool,
+
     /// Resume last session
     #[arg(short, long, global = true)]
     pub r#continue: bool,
