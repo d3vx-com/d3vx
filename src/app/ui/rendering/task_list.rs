@@ -8,38 +8,6 @@ use ratatui::Frame;
 
 use crate::app::state::ParallelChildStatus;
 use crate::app::App;
-use crate::store::task::TaskState;
-
-/// Map internal TaskState to user-facing display text
-fn user_facing_state(state: &TaskState) -> &'static str {
-    match state {
-        TaskState::Backlog => "Queued",
-        TaskState::Queued => "Queued",
-        TaskState::Preparing => "Preparing",
-        TaskState::Spawning => "Starting",
-        TaskState::Research => "Understanding",
-        TaskState::Plan => "Planning",
-        TaskState::Implement => "Implementing",
-        TaskState::Validate => "Validating",
-        TaskState::Analyze => "Analyzing",
-        TaskState::Review => "In review",
-        TaskState::Docs => "Documenting",
-        TaskState::Learn => "Learning",
-        TaskState::Done => "Done",
-        TaskState::Failed => "Failed",
-        TaskState::Fix => "Fixing",
-        TaskState::Test => "Testing",
-        TaskState::AddNew => "Adding",
-        TaskState::Migrate => "Migrating",
-        TaskState::RemoveOld => "Removing",
-        TaskState::Reproduce => "Reproducing",
-        TaskState::Investigate => "Investigating",
-        TaskState::Harden => "Hardening",
-        TaskState::Prepare => "Preparing",
-        TaskState::Execute => "Running",
-        TaskState::Cleanup => "Cleaning up",
-    }
-}
 
 impl App {
     fn latest_parallel_batch(&self) -> Option<&crate::app::state::ParallelBatchState> {
@@ -199,7 +167,7 @@ impl App {
                     Span::styled(&task.title, title_style),
                     Span::raw(" "),
                     Span::styled(
-                        format!("({})", user_facing_state(&task.state)),
+                        format!("({})", task.state.user_label()),
                         Style::default().fg(self.ui.theme.ui.text_dim),
                     ),
                 ]));

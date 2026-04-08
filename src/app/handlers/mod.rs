@@ -231,6 +231,7 @@ impl App {
                                 0 => self.selected_right_pane_tab = RightPaneTab::Agent,
                                 1 => self.selected_right_pane_tab = RightPaneTab::Diff,
                                 2 => self.selected_right_pane_tab = RightPaneTab::Batch,
+                                3 => self.selected_right_pane_tab = RightPaneTab::Trust,
                                 _ => {}
                             }
                             self.ui.selected_agent_output_scroll = 0;

@@ -82,17 +82,13 @@ impl<'a> TrustPanel<'a> {
     fn render_merge_header(&self) -> Vec<Line<'_>> {
         let mut lines = Vec::new();
 
-        let text = match self.merge_readiness {
-            Some(r) if r.ready => "✓ MERGE READY",
-            Some(r) if r.blocked => "✗ MERGE BLOCKED",
-            Some(r) if r.reasons.is_empty() && r.warnings.is_empty() => "? NOT EVALUATED",
-            _ => "? NO DATA",
-        };
-
-        let text_color = match self.merge_readiness {
-            Some(r) if r.ready => Color::Rgb(80, 200, 120),
-            Some(r) if r.blocked => Color::Rgb(220, 100, 100),
-            _ => Color::Rgb(150, 150, 160),
+        let (text, text_color) = match self.merge_readiness {
+            Some(r) if r.ready => ("✓ MERGE READY", Color::Rgb(80, 200, 120)),
+            Some(r) if r.blocked => ("✗ MERGE BLOCKED", Color::Rgb(220, 100, 100)),
+            Some(r) if r.reasons.is_empty() && r.warnings.is_empty() => {
+                ("? Not evaluated yet", Color::Rgb(150, 150, 160))
+            }
+            _ => ("? Waiting for task data", Color::Rgb(150, 150, 160)),
         };
 
         lines.push(Line::from(vec![Span::styled(
@@ -134,16 +130,16 @@ impl<'a> TrustPanel<'a> {
                 QAState::Pending => Color::Rgb(100, 100, 120),
             };
 
-            let iter_text = format!("{}/{}", status.iteration, status.max_retries);
+            let iter_text = if status.max_retries > 1 {
+                format!(" (attempt {}/{})", status.iteration, status.max_retries)
+            } else {
+                String::new()
+            };
 
             lines.push(Line::from(vec![
                 Span::styled("QA: ", Style::default().fg(Color::Rgb(150, 150, 160))),
                 Span::styled(state_text, Style::default().fg(state_color)),
-                Span::raw("  "),
-                Span::styled(
-                    format!("[{}]", iter_text),
-                    Style::default().fg(Color::Rgb(100, 100, 120)),
-                ),
+                Span::styled(iter_text, Style::default().fg(Color::Rgb(100, 100, 120))),
             ]));
 
             if status.pending_fixes > 0 {
@@ -189,20 +185,15 @@ impl<'a> TrustPanel<'a> {
             }
         } else if let Some(review) = self.review_summary {
             let ready = review.status == crate::pipeline::review_summary::ReviewStatus::Approved;
-            let counts = review.count_by_severity();
-            let _blocking = counts[0] + counts[1];
-            (
-                if ready { "[x]" } else { "[!]" },
-                "Review",
-                format!(
-                    "{} {}/{}/{}/{}",
-                    if ready { "approved" } else { "has issues" },
-                    counts[0],
-                    counts[1],
-                    counts[2],
-                    counts[3]
-                ),
-            )
+            let blocking_count = review.blocking_findings.len();
+            let detail = if ready {
+                "passed".to_string()
+            } else if blocking_count > 0 {
+                format!("{} blocking issue(s)", blocking_count)
+            } else {
+                format!("{} finding(s)", review.findings.len())
+            };
+            (if ready { "[x]" } else { "[!]" }, "Review", detail)
         } else {
             ("[-]", "Review", "no data".to_string())
         };

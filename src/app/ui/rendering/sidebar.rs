@@ -158,7 +158,7 @@ impl App {
             )]));
             lines.push(Line::from(vec![
                 Span::styled(
-                    format!(" {} ", task.state),
+                    format!(" {} ", task.state.user_label()),
                     Style::default().bg(self.ui.theme.brand).fg(Color::Black),
                 ),
                 Span::styled(

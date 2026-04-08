@@ -143,12 +143,6 @@ impl<'a> ValidationInspector<'a> {
             ]));
         }
 
-        // Confidence score bar
-        lines.push(Line::from(vec![Span::styled(
-            format!("Confidence: {}%", ui.confidence_score),
-            Style::default().fg(Color::Rgb(150, 150, 160)),
-        )]));
-
         // Merge status
         let (merge_text, merge_color) = if ui.can_merge {
             ("MERGE READY", Color::Rgb(80, 200, 120))

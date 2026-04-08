@@ -112,7 +112,7 @@ impl App {
             ("1", "Agent", crate::app::state::RightPaneTab::Agent),
             ("2", "Diff", crate::app::state::RightPaneTab::Diff),
             ("3", "Batch", crate::app::state::RightPaneTab::Batch),
-            ("4", "Trust", crate::app::state::RightPaneTab::Trust),
+            ("4", "Readiness", crate::app::state::RightPaneTab::Trust),
         ];
 
         let mut spans: Vec<Span<'_>> = Vec::new();

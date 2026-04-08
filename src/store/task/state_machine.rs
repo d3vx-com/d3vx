@@ -157,6 +157,40 @@ impl std::fmt::Display for TaskState {
     }
 }
 
+impl TaskState {
+    /// User-facing label for display in the TUI.
+    /// Returns a concise, human-readable name instead of the internal ALL_CAPS form.
+    pub fn user_label(self) -> &'static str {
+        match self {
+            TaskState::Backlog => "To Do",
+            TaskState::Queued => "Queued",
+            TaskState::Research => "Understanding",
+            TaskState::Plan => "Planning",
+            TaskState::Implement => "Implementing",
+            TaskState::Validate => "Validating",
+            TaskState::Analyze => "Analyzing",
+            TaskState::AddNew => "Adding",
+            TaskState::Migrate => "Migrating",
+            TaskState::RemoveOld => "Removing",
+            TaskState::Reproduce => "Reproducing",
+            TaskState::Investigate => "Investigating",
+            TaskState::Fix => "Fixing",
+            TaskState::Harden => "Hardening",
+            TaskState::Preparing => "Preparing",
+            TaskState::Spawning => "Starting",
+            TaskState::Prepare => "Preparing",
+            TaskState::Test => "Testing",
+            TaskState::Execute => "Executing",
+            TaskState::Cleanup => "Cleaning up",
+            TaskState::Review => "Reviewing",
+            TaskState::Docs => "Documenting",
+            TaskState::Learn => "Learning",
+            TaskState::Done => "Done",
+            TaskState::Failed => "Failed",
+        }
+    }
+}
+
 impl std::str::FromStr for TaskState {
     type Err = String;
 

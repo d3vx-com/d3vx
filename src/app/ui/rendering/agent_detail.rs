@@ -202,7 +202,7 @@ impl App {
         f.render_widget(paragraph, inner);
     }
 
-    /// Render failure context: what went wrong and available recovery actions
+    /// Render failure context: what went wrong (honest — no fake keyboard shortcuts)
     fn render_failure_context(&self, lines: &mut Vec<Line<'_>>, agent: &InlineAgentInfo) {
         let is_cancelled = agent.status == InlineAgentStatus::Cancelled;
 
@@ -223,9 +223,9 @@ impl App {
         // Show last error or tool output
         let last_error = agent.messages.iter().rev().find(|m| {
             matches!(m.line_type, crate::app::state::AgentLineType::ToolOutput)
-                && m.content.contains("ERROR")
-                || m.content.contains("failed")
-                || m.content.contains("error")
+                && (m.content.contains("ERROR")
+                    || m.content.contains("failed")
+                    || m.content.contains("error"))
         });
 
         if let Some(err) = last_error {
@@ -241,47 +241,21 @@ impl App {
             lines.push(Line::from(vec![
                 Span::styled("  ", Style::default()),
                 Span::styled(
-                    format!("Tried {} tool call(s) before stopping", agent.tool_count),
+                    format!(
+                        "Completed {} tool call(s) before stopping",
+                        agent.tool_count
+                    ),
                     Style::default().fg(Color::Rgb(130, 130, 140)),
                 ),
             ]));
         }
 
-        lines.push(Line::raw(""));
-
-        // Recovery actions
+        // Honest guidance — no fake keyboard shortcuts
         if !is_cancelled {
             lines.push(Line::from(vec![Span::styled(
-                "You can:",
-                Style::default()
-                    .fg(Color::Rgb(180, 180, 190))
-                    .add_modifier(Modifier::BOLD),
+                "  Scroll up to review the transcript, or start a new task.",
+                Style::default().fg(Color::Rgb(130, 130, 140)),
             )]));
-
-            lines.push(Line::from(vec![
-                Span::styled("  [R] ", Style::default().fg(Color::Rgb(80, 200, 120))),
-                Span::styled("Retry", Style::default().fg(Color::Rgb(180, 180, 190))),
-                Span::styled(
-                    " — start the task again from scratch",
-                    Style::default().fg(Color::Rgb(130, 130, 140)),
-                ),
-            ]));
-            lines.push(Line::from(vec![
-                Span::styled("  [I] ", Style::default().fg(Color::Rgb(100, 150, 220))),
-                Span::styled("Inspect", Style::default().fg(Color::Rgb(180, 180, 190))),
-                Span::styled(
-                    " — scroll through the transcript above",
-                    Style::default().fg(Color::Rgb(130, 130, 140)),
-                ),
-            ]));
-            lines.push(Line::from(vec![
-                Span::styled("  [X] ", Style::default().fg(Color::Rgb(100, 100, 120))),
-                Span::styled("Dismiss", Style::default().fg(Color::Rgb(180, 180, 190))),
-                Span::styled(
-                    " — remove from the list",
-                    Style::default().fg(Color::Rgb(130, 130, 140)),
-                ),
-            ]));
         }
     }
 }
