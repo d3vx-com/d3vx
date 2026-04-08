@@ -99,6 +99,12 @@ async fn execute_command(cmd: &CliCommand, _cli: &Cli) -> Result<()> {
         CliCommand::Batch { action } => stubs::execute_batch(action).await,
         CliCommand::Docs { action } => stubs::execute_docs(action).await,
         CliCommand::Autonomous { action } => stubs::execute_autonomous(action).await,
+        CliCommand::Task { task_id, cwd, worktree } => {
+            let task_id = task_id.clone();
+            let cwd = cwd.clone().unwrap_or_else(|| ".".to_string());
+            let worktree = worktree.clone().unwrap_or_else(|| format!(".d3vx/worktrees/{}", task_id));
+            vex::run_task_detached(task_id, cwd, worktree).await
+        }
     }
 }
 

@@ -235,6 +235,20 @@ pub enum CliCommand {
         #[command(subcommand)]
         action: AutonomousAction,
     },
+
+    /// Run a specific task by ID (used by Vex mode for detached execution)
+    Task {
+        /// Task ID to run
+        task_id: String,
+
+        /// Working directory
+        #[arg(long)]
+        cwd: Option<String>,
+
+        /// Worktree path
+        #[arg(long)]
+        worktree: Option<String>,
+    },
 }
 
 /// Notify command actions
