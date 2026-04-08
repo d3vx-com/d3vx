@@ -55,6 +55,7 @@ pub fn create_vex_agent(
         session_id: session_id.to_string(),
         role: AgentRole::Executor,
         db,
+        budget: config.budget.clone(),
         ..Default::default()
     };
 

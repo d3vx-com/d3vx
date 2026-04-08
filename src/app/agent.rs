@@ -363,6 +363,7 @@ impl App {
             role: agent_role,
             plan_mode,
             db: db.clone(),
+            budget: config.budget.clone(),
             ..Default::default()
         };
 

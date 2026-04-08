@@ -2,6 +2,7 @@
 
 use tracing::{debug, info, warn};
 
+use crate::agent::cost::calculate_cost_providers;
 use crate::agent::state::{AgentState, StateTransitionReason};
 use crate::providers::{ContentBlock, StopReason};
 use crate::tools::ToolAccessValidator;
@@ -10,6 +11,53 @@ use super::types::{AgentEvent, AgentLoopError, AgentResult, ProgramStepOutcome};
 use super::AgentLoop;
 
 impl AgentLoop {
+    /// Check and enforce budget limits.
+    /// Returns true if budget exceeded and loop should stop.
+    async fn check_budget(&self, model: &str) -> bool {
+        let Some(ref budget) = self.budget_config else {
+            return false;
+        };
+
+        if !budget.enabled {
+            return false;
+        }
+
+        let total_usage = self.total_usage.read().await.clone();
+        let cost = calculate_cost_providers(&total_usage, model);
+        *self.session_cost.write().await = cost;
+
+        let per_session = budget.per_session;
+        let session_id = self.config.read().await.session_id.clone();
+
+        if cost >= budget.pause_at * per_session {
+            warn!(
+                session_id = %session_id,
+                cost = cost,
+                budget = per_session,
+                "Budget exhausted — stopping agent loop"
+            );
+            self.emit(AgentEvent::Error {
+                error: format!(
+                    "Budget exhausted: ${:.2} spent of ${:.2} session limit",
+                    cost, per_session
+                ),
+            });
+            return true;
+        }
+
+        if cost >= budget.warn_at * per_session {
+            warn!(
+                session_id = %session_id,
+                cost = cost,
+                budget = per_session,
+                "Budget warning: {:.0}% of session limit reached",
+                (cost / per_session * 100.0)
+            );
+        }
+
+        false
+    }
+
     /// Run the agent loop with the current conversation.
     ///
     /// This method:
@@ -23,6 +71,7 @@ impl AgentLoop {
         let mut tool_calls = 0u32;
         let mut accumulated_text = String::new();
         let mut task_completed = false;
+        let mut budget_exhausted = false;
 
         // Cache config values to avoid repeated lock acquisition
         let (
@@ -239,6 +288,12 @@ impl AgentLoop {
                 "Iteration completed"
             );
 
+            // Check budget and stop if exceeded
+            if self.check_budget(&model).await {
+                budget_exhausted = true;
+                break;
+            }
+
             // Auto-compact if approaching context limit
             self.auto_compact_if_needed().await;
         }
@@ -290,6 +345,7 @@ impl AgentLoop {
             tool_calls,
             iterations,
             task_completed,
+            budget_exhausted,
         })
     }
 }

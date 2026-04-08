@@ -62,6 +62,10 @@ pub struct AgentLoop {
     lsp_bridge: Option<Arc<crate::lsp::LspBridge>>,
     /// Doom loop detector to catch repetitive tool call patterns.
     doom_detector: std::sync::Mutex<super::doom_loop::DoomLoopDetector>,
+    /// Budget config for enforcement.
+    budget_config: Option<crate::config::types::BudgetConfig>,
+    /// Accumulated session cost in USD.
+    session_cost: Arc<RwLock<f64>>,
 }
 
 impl AgentLoop {
@@ -120,6 +124,8 @@ impl AgentLoop {
             file_change_log: Arc::new(Mutex::new(super::file_change_log::FileChangeLog::new())),
             lsp_bridge: None,
             doom_detector: std::sync::Mutex::new(super::doom_loop::DoomLoopDetector::new()),
+            budget_config: config.budget.clone(),
+            session_cost: Arc::new(RwLock::new(0.0)),
         }
     }
 
@@ -196,6 +202,8 @@ impl AgentLoop {
             )),
             lsp_bridge: None,
             doom_detector: std::sync::Mutex::new(super::doom_loop::DoomLoopDetector::new()),
+            budget_config: config.budget.clone(),
+            session_cost: Arc::new(RwLock::new(0.0)),
         }
     }
 

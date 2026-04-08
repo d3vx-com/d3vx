@@ -17,6 +17,8 @@ pub struct AgentResult {
     pub iterations: u32,
     /// Whether the agent formally completed via complete_task tool.
     pub task_completed: bool,
+    /// Whether the agent stopped due to budget exhaustion.
+    pub budget_exhausted: bool,
 }
 
 /// Internal outcome for program step execution.

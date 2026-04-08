@@ -30,11 +30,13 @@ pub fn get_pricing(model: &str) -> ModelPricing {
             output: 75.0,
             cache_read: 0.0,
         },
-        m if m.contains("gpt-3.5") || m.contains("gpt-4-mini") || m.contains("gpt-4o-mini") => ModelPricing {
-            input: 0.15,
-            output: 0.60,
-            cache_read: 0.0,
-        },
+        m if m.contains("gpt-3.5") || m.contains("gpt-4-mini") || m.contains("gpt-4o-mini") => {
+            ModelPricing {
+                input: 0.15,
+                output: 0.60,
+                cache_read: 0.0,
+            }
+        }
         m if m.contains("gpt-4o") => ModelPricing {
             input: 5.0,
             output: 15.0,
@@ -50,6 +52,20 @@ pub fn get_pricing(model: &str) -> ModelPricing {
 
 /// Calculate USD cost for a token usage event
 pub fn calculate_cost(usage: &TokenUsage, model: &str) -> f64 {
+    let pricing = get_pricing(model);
+
+    let input_cost = (usage.input_tokens as f64 / 1_000_000.0) * pricing.input;
+    let output_cost = (usage.output_tokens as f64 / 1_000_000.0) * pricing.output;
+    let cache_cost = usage
+        .cache_read_tokens
+        .map(|t| (t as f64 / 1_000_000.0) * pricing.cache_read)
+        .unwrap_or(0.0);
+
+    input_cost + output_cost + cache_cost
+}
+
+/// Calculate USD cost using providers::TokenUsage
+pub fn calculate_cost_providers(usage: &crate::providers::TokenUsage, model: &str) -> f64 {
     let pricing = get_pricing(model);
 
     let input_cost = (usage.input_tokens as f64 / 1_000_000.0) * pricing.input;

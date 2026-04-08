@@ -51,6 +51,9 @@ pub struct AgentConfig {
     /// Optional database handle for session state persistence.
     #[serde(skip)]
     pub db: Option<crate::store::database::DatabaseHandle>,
+    /// Budget enforcement config.
+    #[serde(skip)]
+    pub budget: Option<crate::config::types::BudgetConfig>,
 }
 
 impl Default for AgentConfig {
@@ -75,6 +78,7 @@ impl Default for AgentConfig {
             plan_mode: false,
             skip_compaction: false,
             db: None,
+            budget: None,
         }
     }
 }
