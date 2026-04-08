@@ -75,7 +75,9 @@ impl App {
             self.last_workspace_refresh = Instant::now();
         }
 
+        // Poll for vex agent updates (every 500ms)
         if self.last_orchestrator_refresh.elapsed() >= Duration::from_millis(500) {
+            // Update orchestrator stats
             self.background_active_tasks = tokio::task::block_in_place(|| {
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(self.orchestrator.active_tasks_list())
@@ -88,6 +90,40 @@ impl App {
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(self.orchestrator.worker_pool_stats())
             });
+
+            // Poll vex agents and add to inline_agents
+            if let Some(ref db) = self.db {
+                let project_path = self.cwd.as_deref().unwrap_or(".");
+                let vex_agents = crate::app::vex_agent_poller::poll_vex_agents(db, project_path);
+
+                // Find the index of vex agents in inline_agents
+                // Vex agents have IDs starting with "vex:"
+                let existing_vex: Vec<_> = self
+                    .agents
+                    .inline_agents
+                    .iter()
+                    .filter(|a| a.id.starts_with("vex:"))
+                    .cloned()
+                    .collect();
+
+                // Update or add vex agents
+                for vex_agent in vex_agents {
+                    let existing = self
+                        .agents
+                        .inline_agents
+                        .iter()
+                        .position(|a| a.id == vex_agent.id);
+
+                    if let Some(idx) = existing {
+                        // Update existing vex agent
+                        self.agents.inline_agents[idx] = vex_agent;
+                    } else {
+                        // Add new vex agent
+                        self.agents.inline_agents.push(vex_agent);
+                    }
+                }
+            }
+
             self.last_orchestrator_refresh = Instant::now();
         }
 

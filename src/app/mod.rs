@@ -40,6 +40,7 @@ pub mod state;
 pub mod task_views;
 pub mod ui;
 pub mod update;
+pub mod vex_agent_poller;
 
 #[cfg(test)]
 mod tests;

@@ -20,8 +20,8 @@ mod ui_state;
 // Re-export all public types for backward compatibility
 pub use agent_state::AgentState;
 pub use inline_agent::{
-    CandidateEvaluation, InlineAgentInfo, InlineAgentStatus, InlineAgentUpdate, ParallelBatchState,
-    ParallelChildStatus, ParallelChildTask,
+    AgentLineType, AgentMessageLine, CandidateEvaluation, InlineAgentInfo, InlineAgentStatus,
+    InlineAgentUpdate, ParallelBatchState, ParallelChildStatus, ParallelChildTask,
 };
 pub use layout_state::LayoutState;
 pub use session_state::SessionState;
