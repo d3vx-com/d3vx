@@ -60,6 +60,20 @@ impl<'a> TrustPanel<'a> {
 
         lines.extend(self.render_signals());
 
+        // Detailed validation breakdown (check-by-check)
+        if let Some(validation) = self.validation_summary {
+            lines.push(Line::raw(""));
+            lines.extend(self.render_validation_detail(validation));
+        }
+
+        // Detailed review findings (individual issues)
+        if let Some(review) = self.review_summary {
+            if !review.findings.is_empty() {
+                lines.push(Line::raw(""));
+                lines.extend(self.render_findings_detail(review));
+            }
+        }
+
         if let Some(readiness) = self.merge_readiness {
             if !readiness.reasons.is_empty() {
                 lines.push(Line::raw(""));
@@ -301,6 +315,151 @@ impl<'a> TrustPanel<'a> {
             ),
             Span::styled(detail, Style::default().fg(Color::Rgb(140, 140, 150))),
         ])]
+    }
+
+    /// Render per-check validation breakdown (type-check, test, lint)
+    fn render_validation_detail(&self, validation: &ValidationSummary) -> Vec<Line<'_>> {
+        let mut lines = Vec::new();
+
+        lines.push(Line::from(vec![Span::styled(
+            "Checks detail",
+            Style::default()
+                .fg(Color::Rgb(150, 150, 160))
+                .add_modifier(Modifier::BOLD),
+        )]));
+
+        let ui = validation.summary_for_ui();
+
+        let checks = [
+            ("Type check", ui.type_check_passed),
+            ("Tests", ui.test_passed),
+            ("Lint", ui.lint_passed),
+        ];
+
+        for (name, result) in checks {
+            let (icon, color) = match result {
+                Some(true) => ("pass", Color::Rgb(80, 200, 120)),
+                Some(false) => ("fail", Color::Rgb(220, 100, 100)),
+                None => ("—", Color::Rgb(80, 80, 100)),
+            };
+            lines.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(format!("{:>4} ", icon), Style::default().fg(color)),
+                Span::styled(name, Style::default().fg(Color::Rgb(180, 180, 190))),
+            ]));
+        }
+
+        // Overall pass rate
+        if validation.total > 0 {
+            let rate = validation.passed * 100 / validation.total;
+            let rate_color = if rate >= 100 {
+                Color::Rgb(80, 200, 120)
+            } else if rate >= 50 {
+                Color::Rgb(220, 180, 60)
+            } else {
+                Color::Rgb(220, 100, 100)
+            };
+            lines.push(Line::from(vec![Span::styled(
+                format!("  {}/{} passed ", validation.passed, validation.total),
+                Style::default().fg(rate_color),
+            )]));
+        }
+
+        lines
+    }
+
+    /// Render individual review findings
+    fn render_findings_detail(&self, review: &ReviewSummary) -> Vec<Line<'static>> {
+        let mut lines = Vec::new();
+
+        lines.push(Line::from(vec![Span::styled(
+            "Findings",
+            Style::default()
+                .fg(Color::Rgb(150, 150, 160))
+                .add_modifier(Modifier::BOLD),
+        )]));
+
+        use crate::pipeline::review_summary::{FindingCategory, ReviewSeverity};
+
+        for finding in &review.findings {
+            let severity_icon = match finding.severity {
+                ReviewSeverity::Critical => "!!!",
+                ReviewSeverity::High => " !!",
+                ReviewSeverity::Medium => "  !",
+                ReviewSeverity::Low => "  o",
+            };
+
+            let severity_color = match finding.severity {
+                ReviewSeverity::Critical => Color::Rgb(220, 60, 60),
+                ReviewSeverity::High => Color::Rgb(220, 140, 60),
+                ReviewSeverity::Medium => Color::Rgb(220, 180, 60),
+                ReviewSeverity::Low => Color::Rgb(100, 140, 100),
+            };
+
+            let resolved = if finding.resolved { "[x]" } else { "[ ]" };
+
+            let category = match finding.category {
+                FindingCategory::Correctness => "correctness",
+                FindingCategory::Security => "security",
+                FindingCategory::Performance => "perf",
+                FindingCategory::Maintainability => "maintain",
+                FindingCategory::Coverage => "coverage",
+                FindingCategory::Breaking => "breaking",
+                FindingCategory::Risk => "risk",
+                FindingCategory::Documentation => "docs",
+            };
+
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!(" {} ", resolved),
+                    Style::default().fg(Color::Rgb(100, 100, 120)),
+                ),
+                Span::styled(
+                    format!("{} ", severity_icon),
+                    Style::default().fg(severity_color),
+                ),
+                Span::styled(
+                    finding.title.clone(),
+                    Style::default().fg(Color::Rgb(220, 220, 230)),
+                ),
+            ]));
+
+            // Location and category on second line
+            let location = finding
+                .location
+                .as_ref()
+                .map(|l| {
+                    if let Some(line) = l.line {
+                        format!("{}:{}", l.file, line)
+                    } else {
+                        l.file.clone()
+                    }
+                })
+                .unwrap_or_default();
+
+            lines.push(Line::from(vec![
+                Span::raw("       "),
+                Span::styled(category, Style::default().fg(Color::Rgb(80, 140, 200))),
+                if !location.is_empty() {
+                    Span::styled(
+                        format!(" {}", location),
+                        Style::default().fg(Color::Rgb(100, 120, 140)),
+                    )
+                } else {
+                    Span::raw("")
+                },
+                if let Some(suggestion) = &finding.suggestion {
+                    Span::styled(
+                        format!(" → {}", suggestion),
+                        Style::default().fg(Color::Rgb(100, 180, 140)),
+                    )
+                } else {
+                    Span::raw("")
+                },
+            ]));
+        }
+
+        lines
     }
 
     fn render_blocking_reasons<'b>(&self, readiness: &'b MergeReadiness) -> Vec<Line<'b>> {
