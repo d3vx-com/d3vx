@@ -161,7 +161,7 @@ impl<'a> TrustPanel<'a> {
         let mut lines = Vec::new();
 
         lines.push(Line::from(vec![Span::styled(
-            "Signals",
+            "Checks",
             Style::default()
                 .fg(Color::Rgb(150, 150, 160))
                 .add_modifier(Modifier::BOLD),
