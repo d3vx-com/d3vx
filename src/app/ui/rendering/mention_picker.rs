@@ -108,6 +108,39 @@ impl App {
             Span::styled(&req.message, Style::default().fg(self.ui.theme.ui.text)),
         ]));
 
+        // Risk level based on tool type
+        if let Some(ref tool_name) = req.tool_name {
+            let (risk_label, risk_color, risk_desc) = match tool_name.as_str() {
+                "Bash" | "BashTool" => {
+                    ("HIGH", Color::Rgb(220, 100, 100), "runs arbitrary commands")
+                }
+                "Write" | "WriteTool" => (
+                    "HIGH",
+                    Color::Rgb(220, 100, 100),
+                    "creates or overwrites files",
+                ),
+                "Edit" | "EditTool" | "MultiEditTool" => (
+                    "MEDIUM",
+                    Color::Rgb(220, 180, 60),
+                    "modifies existing files",
+                ),
+                "Read" | "ReadTool" | "Glob" | "GlobTool" | "Grep" | "GrepTool" => (
+                    "LOW",
+                    Color::Rgb(80, 200, 120),
+                    "reads files without changes",
+                ),
+                _ => ("MEDIUM", Color::Rgb(220, 180, 60), "modifies project state"),
+            };
+            lines.push(Line::from(vec![
+                Span::styled("Risk: ", Style::default().fg(self.ui.theme.ui.text_muted)),
+                Span::styled(
+                    format!("{} ", risk_label),
+                    Style::default().fg(risk_color).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(risk_desc, Style::default().fg(Color::Rgb(130, 130, 140))),
+            ]));
+        }
+
         lines.push(Line::raw(""));
 
         // Diff Preview Hint (if available)

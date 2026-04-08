@@ -8,6 +8,7 @@ use ratatui::Frame;
 
 use crate::app::state::InlineAgentStatus;
 use crate::app::App;
+use crate::app::InlineAgentInfo;
 use crate::ui::symbols::AI_INDICATOR;
 
 use crate::app::ui::helpers::{braille_frame, MUTED_WHITE};
@@ -134,6 +135,14 @@ impl App {
                 ]));
             }
         }
+        // Failure context for failed/cancelled agents
+        if matches!(
+            agent.status,
+            InlineAgentStatus::Failed | InlineAgentStatus::Cancelled
+        ) {
+            self.render_failure_context(&mut detail_lines, agent);
+        }
+
         detail_lines.push(Line::raw(""));
 
         // Clean Text Transcript (No tool noise)
@@ -191,6 +200,89 @@ impl App {
             .wrap(Wrap { trim: true })
             .scroll((self.ui.selected_agent_output_scroll as u16, 0));
         f.render_widget(paragraph, inner);
+    }
+
+    /// Render failure context: what went wrong and available recovery actions
+    fn render_failure_context(&self, lines: &mut Vec<Line<'_>>, agent: &InlineAgentInfo) {
+        let is_cancelled = agent.status == InlineAgentStatus::Cancelled;
+
+        // Header line explaining what happened
+        let (header_text, header_color) = if is_cancelled {
+            ("Task was cancelled", Color::Rgb(150, 150, 160))
+        } else {
+            ("Something went wrong", Color::Rgb(220, 100, 100))
+        };
+
+        lines.push(Line::from(vec![Span::styled(
+            header_text,
+            Style::default()
+                .fg(header_color)
+                .add_modifier(Modifier::BOLD),
+        )]));
+
+        // Show last error or tool output
+        let last_error = agent.messages.iter().rev().find(|m| {
+            matches!(m.line_type, crate::app::state::AgentLineType::ToolOutput)
+                && m.content.contains("ERROR")
+                || m.content.contains("failed")
+                || m.content.contains("error")
+        });
+
+        if let Some(err) = last_error {
+            let err_content = err.content.clone();
+            lines.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(err_content, Style::default().fg(Color::Rgb(200, 140, 140))),
+            ]));
+        }
+
+        // Show what was attempted
+        if agent.tool_count > 0 {
+            lines.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(
+                    format!("Tried {} tool call(s) before stopping", agent.tool_count),
+                    Style::default().fg(Color::Rgb(130, 130, 140)),
+                ),
+            ]));
+        }
+
+        lines.push(Line::raw(""));
+
+        // Recovery actions
+        if !is_cancelled {
+            lines.push(Line::from(vec![Span::styled(
+                "You can:",
+                Style::default()
+                    .fg(Color::Rgb(180, 180, 190))
+                    .add_modifier(Modifier::BOLD),
+            )]));
+
+            lines.push(Line::from(vec![
+                Span::styled("  [R] ", Style::default().fg(Color::Rgb(80, 200, 120))),
+                Span::styled("Retry", Style::default().fg(Color::Rgb(180, 180, 190))),
+                Span::styled(
+                    " — start the task again from scratch",
+                    Style::default().fg(Color::Rgb(130, 130, 140)),
+                ),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("  [I] ", Style::default().fg(Color::Rgb(100, 150, 220))),
+                Span::styled("Inspect", Style::default().fg(Color::Rgb(180, 180, 190))),
+                Span::styled(
+                    " — scroll through the transcript above",
+                    Style::default().fg(Color::Rgb(130, 130, 140)),
+                ),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("  [X] ", Style::default().fg(Color::Rgb(100, 100, 120))),
+                Span::styled("Dismiss", Style::default().fg(Color::Rgb(180, 180, 190))),
+                Span::styled(
+                    " — remove from the list",
+                    Style::default().fg(Color::Rgb(130, 130, 140)),
+                ),
+            ]));
+        }
     }
 }
 

@@ -196,7 +196,37 @@ impl<'a> ToolDisplay<'a> {
         } else {
             self.theme.ui.text_dim
         };
-        let prefix = if is_error { "Error: " } else { "" };
+
+        // Context-aware error prefix for file tools
+        let context_prefix = if is_error {
+            match self.name {
+                "EditTool" | "MultiEditTool" => {
+                    let path = self.input.get("file_path").and_then(|v| v.as_str());
+                    path.map(|p| format!("Edit failed in {}: ", p))
+                        .unwrap_or_else(|| "Edit failed: ".to_string())
+                }
+                "WriteTool" | "Write" => {
+                    let path = self.input.get("file_path").and_then(|v| v.as_str());
+                    path.map(|p| format!("Write failed in {}: ", p))
+                        .unwrap_or_else(|| "Write failed: ".to_string())
+                }
+                "BashTool" | "Bash" => {
+                    let cmd = self.input.get("command").and_then(|v| v.as_str());
+                    cmd.map(|c| {
+                        let display = if c.len() > 40 {
+                            format!("{}...", &c[..37])
+                        } else {
+                            c.to_string()
+                        };
+                        format!("Command `{}` failed: ", display)
+                    })
+                    .unwrap_or_else(|| "Command failed: ".to_string())
+                }
+                _ => "Error: ".to_string(),
+            }
+        } else {
+            String::new()
+        };
 
         let mut output_to_render = output.to_string();
 
@@ -233,7 +263,7 @@ impl<'a> ToolDisplay<'a> {
                 lines.push(Line::from(vec![
                     Span::raw("    "),
                     Span::styled(
-                        format!("{}{}", prefix, truncate_line(line)),
+                        format!("{}{}", context_prefix, truncate_line(line)),
                         Style::default().fg(color),
                     ),
                 ]));
@@ -255,7 +285,7 @@ impl<'a> ToolDisplay<'a> {
                 lines.push(Line::from(vec![
                     Span::raw("    "),
                     Span::styled(
-                        format!("{}{}", prefix, truncate_line(first)),
+                        format!("{}{}", context_prefix, truncate_line(first)),
                         Style::default().fg(color),
                     ),
                 ]));
@@ -278,7 +308,7 @@ impl<'a> ToolDisplay<'a> {
                         lines.push(Line::from(vec![
                             Span::raw("    "),
                             Span::styled(
-                                format!("{}{}", prefix, truncate_line(last)),
+                                format!("{}{}", context_prefix, truncate_line(last)),
                                 Style::default().fg(color),
                             ),
                         ]));
