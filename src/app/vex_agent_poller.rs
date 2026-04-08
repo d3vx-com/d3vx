@@ -24,15 +24,21 @@ fn log_to_message_line(log: &TaskLog) -> Option<AgentMessageLine> {
         }
         "tool_start" => {
             let name = data.get("name")?.as_str()?.to_string();
-            (AgentLineType::ToolCall, format!("Tool: {}", name))
+            // Show file path for file tools instead of raw tool name
+            let detail = data
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .map(|p| format!("{}: {}", name, p))
+                .unwrap_or_else(|| name);
+            (AgentLineType::ToolCall, detail)
         }
         "tool_end" => {
             let name = data.get("name")?.as_str()?.to_string();
             let is_error = data.get("is_error")?.as_bool().unwrap_or(false);
             if is_error {
-                (AgentLineType::ToolOutput, format!("Tool {}: ERROR", name))
+                (AgentLineType::ToolOutput, format!("{}: failed", name))
             } else {
-                (AgentLineType::ToolOutput, format!("Tool {}: Done", name))
+                (AgentLineType::ToolOutput, format!("{}: done", name))
             }
         }
         "text" => {

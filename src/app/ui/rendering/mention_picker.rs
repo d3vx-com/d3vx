@@ -150,13 +150,17 @@ impl App {
             ),
             Span::styled("  ", Style::default()),
             Span::styled(
-                " [V] Always Trust ",
+                " [V] Auto-approve all ",
                 Style::default()
                     .bg(self.ui.theme.brand)
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD),
             ),
         ]));
+        lines.push(Line::from(vec![Span::styled(
+            "   Auto-approve will skip this prompt for the rest of the session.",
+            Style::default().fg(self.ui.theme.ui.text_dim),
+        )]));
 
         let p = Paragraph::new(lines).wrap(Wrap { trim: true });
         f.render_widget(p, area);

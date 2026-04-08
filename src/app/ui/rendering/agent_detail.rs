@@ -54,13 +54,21 @@ impl App {
         // Header: Braille Spinner + Task Title
         let (status_icon, status_color) = agent_status_style(agent.status, self);
 
+        // Header: Braille Spinner + Task Title (prefix "Background:" for vex agents)
+        let is_background = agent.id.starts_with("vex:");
+        let task_label = if is_background {
+            format!("Background: {}", agent.task)
+        } else {
+            agent.task.clone()
+        };
+
         detail_lines.push(Line::from(vec![
             Span::styled(
                 format!("{} ", status_icon),
                 Style::default().fg(status_color),
             ),
             Span::styled(
-                agent.task.clone(),
+                task_label,
                 Style::default()
                     .fg(self.ui.theme.brand)
                     .add_modifier(Modifier::BOLD),

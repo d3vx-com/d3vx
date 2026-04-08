@@ -39,7 +39,7 @@ impl<'a> TrustPanel<'a> {
 
     pub fn render(&self, f: &mut Frame, area: Rect) {
         let block = Block::default()
-            .title("Trust Signals")
+            .title(" Readiness ")
             .borders(Borders::ALL)
             .style(Style::default().bg(Color::Rgb(26, 26, 26)));
 
@@ -394,9 +394,7 @@ mod tests {
 
     #[test]
     fn test_trust_panel_with_blocked_readiness() {
-        use crate::pipeline::merge_gate::{
-            MergeBlockingReason, MergeSignals,
-        };
+        use crate::pipeline::merge_gate::{MergeBlockingReason, MergeSignals};
 
         let readiness = MergeReadiness::blocked(
             vec![
