@@ -16,6 +16,8 @@ use crate::pipeline::scheduler::ExecutionGuard;
 use crate::pipeline::WorkerPool;
 use tracing::info;
 
+use super::tools;
+
 fn tmux_session_name(task_id: &str) -> String {
     format!("d3vx-{}", task_id)
 }
@@ -23,7 +25,7 @@ fn tmux_session_name(task_id: &str) -> String {
 async fn spawn_tmux_session(session_name: &str, command: &str) -> Result<()> {
     let escaped_cmd = command.replace("'", "'\\''");
     let session_arg = format!("'{}'", escaped_cmd);
-    
+
     tokio::process::Command::new("sh")
         .arg("-c")
         .arg(format!("tmux new-session -d -s {} {}", session_name, session_arg))
@@ -31,7 +33,7 @@ async fn spawn_tmux_session(session_name: &str, command: &str) -> Result<()> {
         .stderr(Stdio::null())
         .spawn()
         .map_err(|e| anyhow::anyhow!("Failed to create tmux session: {}", e))?;
-    
+
     Ok(())
 }
 
@@ -53,9 +55,11 @@ pub async fn run_vex_mode(query: &str, cli: &Cli) -> Result<()> {
         .cwd
         .as_ref()
         .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|| std::env::current_dir()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| ".".to_string()));
+        .unwrap_or_else(|| {
+            std::env::current_dir()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| ".".to_string())
+        });
 
     let db = crate::store::database::Database::open_default()
         .ok()
@@ -74,7 +78,7 @@ pub async fn run_vex_mode(query: &str, cli: &Cli) -> Result<()> {
 
     let session = tmux_session_name(&handle.task_id);
     let worktree = handle.worktree_path.to_string_lossy();
-    
+
     let task_cmd = format!(
         "d3vx task {} --cwd {} --worktree '{}'",
         handle.task_id,
@@ -111,7 +115,7 @@ pub async fn run_vex_mode(query: &str, cli: &Cli) -> Result<()> {
 }
 
 pub async fn run_task_detached(task_id: String, cwd: String, worktree: String) -> Result<()> {
-    info!(task_id = %task_id, "Running task in detached mode");
+    info!(task_id = %task_id, cwd = %cwd, worktree = %worktree, "Running task in detached mode");
 
     let db = crate::store::database::Database::open_default()
         .map(|d| Arc::new(parking_lot::Mutex::new(d)))
@@ -122,13 +126,23 @@ pub async fn run_task_detached(task_id: String, cwd: String, worktree: String) -
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join(".d3vx/checkpoints");
 
-    let orchestrator = PipelineOrchestrator::new(orch_config, Some(db)).await?;
+    let orchestrator = PipelineOrchestrator::new(orch_config, Some(db.clone())).await?;
     let queue = orchestrator.queue();
 
     let task = queue.get_task(&task_id).await
         .ok_or_else(|| anyhow::anyhow!("Task {} not found in queue", task_id))?;
 
     queue.update_status(&task_id, TaskStatus::InProgress).await?;
+
+    let config = load_config(LoadConfigOptions::default())
+        .map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
+
+    let provider = tools::create_provider(&config)?;
+
+    let tools = tools::build_vex_tools().await;
+
+    let db_handle = Some(db.clone());
+    let agent = tools::create_vex_agent(&config, provider, tools, &cwd, &task_id, db_handle)?;
 
     let worktree_pool = Arc::new(WorkerPool::with_defaults());
     let lease = worktree_pool.acquire_worker(&task_id).await
@@ -137,7 +151,7 @@ pub async fn run_task_detached(task_id: String, cwd: String, worktree: String) -
 
     let context = PhaseContext::new(task.clone(), &cwd, &worktree);
 
-    let result = orchestrator.engine().run(task.clone(), context).await
+    let result = orchestrator.engine().run_with_agent(task.clone(), context, Arc::new(agent)).await
         .map_err(|e| anyhow::anyhow!("Task execution failed: {}", e))?;
 
     if result.success {
