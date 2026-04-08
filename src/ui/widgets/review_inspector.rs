@@ -71,7 +71,40 @@ impl<'a> ReviewInspector<'a> {
             severity_counts[0], severity_counts[1], severity_counts[2], severity_counts[3]
         );
 
+        // Recommended action based on review status
+        let (action_text, action_color) = match review.status {
+            ReviewStatus::Pending => (
+                "Waiting for review to complete...",
+                Color::Rgb(180, 180, 100),
+            ),
+            ReviewStatus::InProgress => ("Review in progress...", Color::Rgb(100, 150, 220)),
+            ReviewStatus::Approved => (
+                "Safe to approve — no blocking issues found",
+                Color::Rgb(80, 200, 120),
+            ),
+            ReviewStatus::Rejected => {
+                if review.blocking_findings.is_empty() {
+                    (
+                        "Issues found — review details below",
+                        Color::Rgb(220, 180, 60),
+                    )
+                } else {
+                    (
+                        "Blocking issues found — resolve before approving",
+                        Color::Rgb(220, 100, 100),
+                    )
+                }
+            }
+            ReviewStatus::Skipped => ("Review was skipped", Color::Rgb(100, 100, 120)),
+        };
+
         let lines = vec![
+            Line::from(vec![Span::styled(
+                action_text,
+                Style::default()
+                    .fg(action_color)
+                    .add_modifier(Modifier::BOLD),
+            )]),
             Line::from(vec![
                 Span::styled("Status: ", Style::default().fg(Color::Rgb(150, 150, 160))),
                 Span::styled(

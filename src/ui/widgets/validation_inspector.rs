@@ -54,6 +54,32 @@ impl<'a> ValidationInspector<'a> {
 
         let mut lines = Vec::new();
 
+        // One-line summary at top
+        let summary_text: String = match ui.confidence {
+            Confidence::None => "Checks not run yet".into(),
+            Confidence::InProgress => "Checks running...".into(),
+            Confidence::High => format!("All checks passed ({}/{})", ui.passed, ui.total),
+            Confidence::Medium => format!(
+                "Mostly passing — {} check(s) with warnings",
+                ui.total.saturating_sub(ui.passed)
+            ),
+            Confidence::Low => format!("{} check(s) failed — needs attention", ui.failed),
+        };
+        let summary_color = match ui.confidence {
+            Confidence::None => Color::Rgb(100, 100, 120),
+            Confidence::InProgress => Color::Rgb(100, 150, 220),
+            Confidence::High => Color::Rgb(80, 200, 120),
+            Confidence::Medium => Color::Rgb(220, 180, 60),
+            Confidence::Low => Color::Rgb(220, 100, 100),
+        };
+        lines.push(Line::from(vec![Span::styled(
+            summary_text,
+            Style::default()
+                .fg(summary_color)
+                .add_modifier(Modifier::BOLD),
+        )]));
+        lines.push(Line::raw(""));
+
         // Status line with confidence
         lines.push(Line::from(vec![
             Span::styled("Status: ", Style::default().fg(Color::Rgb(150, 150, 160))),
