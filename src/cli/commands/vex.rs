@@ -3,10 +3,12 @@
 //! Handles `d3vx --vex "task description"` — creates a background
 //! autonomous task that runs in an isolated worktree.
 
+use std::sync::Arc;
+
 use anyhow::Result;
 
 use crate::cli::args::Cli;
-use crate::config::{get_provider_config, load_config, LoadConfigOptions};
+use crate::config::{load_config, LoadConfigOptions};
 use crate::pipeline::orchestrator::PipelineOrchestrator;
 use crate::pipeline::vex_manager::VexManager;
 use tracing::info;
@@ -39,12 +41,19 @@ pub async fn run_vex_mode(query: &str, cli: &Cli) -> Result<()> {
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|_| ".".to_string()));
 
-    // Create orchestrator for Vex task management
-    let orchestrator = PipelineOrchestrator::new(
-        crate::pipeline::orchestrator::OrchestratorConfig::default(),
-        None, // No existing database handle needed for Vex tasks
-    )
-    .await?;
+    // Initialize database for task persistence
+    let db = crate::store::database::Database::open_default()
+        .ok()
+        .map(|d| Arc::new(parking_lot::Mutex::new(d)));
+
+    // Create orchestrator with config-backed settings
+    let mut orch_config = crate::pipeline::orchestrator::OrchestratorConfig::default();
+    orch_config.checkpoint_dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".d3vx/checkpoints");
+    orch_config.github = config.integrations.as_ref().and_then(|i| i.github.clone());
+
+    let orchestrator = PipelineOrchestrator::new(orch_config, db).await?;
 
     let vex_manager = orchestrator.vex_manager();
 
