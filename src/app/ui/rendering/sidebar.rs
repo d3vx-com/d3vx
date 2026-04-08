@@ -161,10 +161,7 @@ impl App {
                     format!(" {} ", task.state.user_label()),
                     Style::default().bg(self.ui.theme.brand).fg(Color::Black),
                 ),
-                Span::styled(
-                    format!(" {}", task.pipeline_phase.as_deref().unwrap_or("")),
-                    Style::default().fg(muted_color),
-                ),
+                Span::styled(format!(" {}", task.title), Style::default().fg(muted_color)),
             ]));
 
             // Use unified trust data parser

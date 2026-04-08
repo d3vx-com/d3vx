@@ -221,21 +221,28 @@ impl App {
                         && y >= tab_rect.y
                         && y < tab_rect.y + tab_rect.height
                     {
-                        // Calculate position relative to tab bar (tabs start after "Tabs ")
                         let rel_x = (x - tab_rect.x) as usize;
-                        // Each tab is roughly " N Name " format
-                        // "Tabs " = 5 chars, then tabs at ~8 chars each
-                        if rel_x >= 5 {
-                            let tab_index = (rel_x - 5) / 8;
-                            match tab_index {
-                                0 => self.selected_right_pane_tab = RightPaneTab::Agent,
-                                1 => self.selected_right_pane_tab = RightPaneTab::Diff,
-                                2 => self.selected_right_pane_tab = RightPaneTab::Batch,
-                                3 => self.selected_right_pane_tab = RightPaneTab::Trust,
-                                _ => {}
+                        // Actual rendered tab widths: " N:Label " with "│" between tabs
+                        let tab_labels = ["1:Agent", "2:Diff", "3:Batch", "4:Readiness"];
+                        let tab_tabs = [
+                            RightPaneTab::Agent,
+                            RightPaneTab::Diff,
+                            RightPaneTab::Batch,
+                            RightPaneTab::Trust,
+                        ];
+                        let mut offset = 0usize;
+                        for (i, label) in tab_labels.iter().enumerate() {
+                            let tab_width = label.len() + 2; // " " + label + " "
+                            if rel_x >= offset && rel_x < offset + tab_width {
+                                self.selected_right_pane_tab = tab_tabs[i];
+                                self.ui.selected_agent_output_scroll = 0;
+                                return Ok(());
                             }
-                            self.ui.selected_agent_output_scroll = 0;
-                            return Ok(());
+                            offset += tab_width;
+                            // Skip separator "│" between tabs
+                            if i < tab_labels.len() - 1 {
+                                offset += 1;
+                            }
                         }
                     }
                 }

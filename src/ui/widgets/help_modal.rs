@@ -90,7 +90,7 @@ impl Widget for HelpModal {
         text.push(Line::from(vec![
             Span::styled("  Add ", Style::default().fg(self.theme.ui.text_dim)),
             Span::styled(
-                "--background ",
+                "--vex ",
                 Style::default()
                     .fg(self.theme.brand_secondary)
                     .add_modifier(Modifier::BOLD),
