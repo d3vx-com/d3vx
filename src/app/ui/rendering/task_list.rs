@@ -8,6 +8,38 @@ use ratatui::Frame;
 
 use crate::app::state::ParallelChildStatus;
 use crate::app::App;
+use crate::store::task::TaskState;
+
+/// Map internal TaskState to user-facing display text
+fn user_facing_state(state: &TaskState) -> &'static str {
+    match state {
+        TaskState::Backlog => "Queued",
+        TaskState::Queued => "Queued",
+        TaskState::Preparing => "Preparing",
+        TaskState::Spawning => "Starting",
+        TaskState::Research => "Understanding",
+        TaskState::Plan => "Planning",
+        TaskState::Implement => "Implementing",
+        TaskState::Validate => "Validating",
+        TaskState::Analyze => "Analyzing",
+        TaskState::Review => "In review",
+        TaskState::Docs => "Documenting",
+        TaskState::Learn => "Learning",
+        TaskState::Done => "Done",
+        TaskState::Failed => "Failed",
+        TaskState::Fix => "Fixing",
+        TaskState::Test => "Testing",
+        TaskState::AddNew => "Adding",
+        TaskState::Migrate => "Migrating",
+        TaskState::RemoveOld => "Removing",
+        TaskState::Reproduce => "Reproducing",
+        TaskState::Investigate => "Investigating",
+        TaskState::Harden => "Hardening",
+        TaskState::Prepare => "Preparing",
+        TaskState::Execute => "Running",
+        TaskState::Cleanup => "Cleaning up",
+    }
+}
 
 impl App {
     fn latest_parallel_batch(&self) -> Option<&crate::app::state::ParallelBatchState> {
@@ -25,13 +57,17 @@ impl App {
         let mut lines = Vec::new();
         lines.push(Line::from(vec![
             Span::styled(
-                format!("Multi-Agent Graph #{}", &batch.id[..batch.id.len().min(8)]),
+                format!("Parallel Agents #{}", &batch.id[..batch.id.len().min(8)]),
                 Style::default()
                     .fg(self.ui.theme.brand)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                if batch.select_best { "  best-of-N" } else { "" },
+                if batch.select_best {
+                    "  picking best"
+                } else {
+                    ""
+                },
                 Style::default().fg(self.ui.theme.brand_secondary),
             ),
         ]));
@@ -93,7 +129,7 @@ impl App {
 
     pub fn render_task_list(&self, f: &mut Frame, area: Rect) {
         let block = Block::default()
-            .title(" TASK LIST ")
+            .title(" Tasks ")
             .borders(Borders::ALL)
             .border_style(Style::default().fg(self.ui.theme.ui.border));
         let inner = block.inner(area);
@@ -122,7 +158,7 @@ impl App {
 
         if self.task_view_tasks.is_empty() {
             lines.push(Line::from(vec![Span::styled(
-                "No tasks available.",
+                "No tasks yet. Describe what you'd like done to get started.",
                 Style::default().fg(self.ui.theme.ui.text_dim),
             )]));
         } else {
@@ -163,7 +199,7 @@ impl App {
                     Span::styled(&task.title, title_style),
                     Span::raw(" "),
                     Span::styled(
-                        format!("({})", task.state.to_string()),
+                        format!("({})", user_facing_state(&task.state)),
                         Style::default().fg(self.ui.theme.ui.text_dim),
                     ),
                 ]));
