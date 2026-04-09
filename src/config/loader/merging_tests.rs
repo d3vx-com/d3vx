@@ -30,7 +30,8 @@ fn test_merge_empty_source() {
 
 #[test]
 fn test_merge_primitive_overrides() {
-    let target = serde_yaml::from_str::<serde_yaml::Value>("provider: openai\nmodel: gpt-4").unwrap();
+    let target =
+        serde_yaml::from_str::<serde_yaml::Value>("provider: openai\nmodel: gpt-4").unwrap();
     let source = serde_yaml::from_str::<serde_yaml::Value>("provider: anthropic").unwrap();
     let result = deep_merge(&target, &source);
     assert_eq!(result["provider"], "anthropic");
@@ -106,10 +107,7 @@ fn test_parse_int() {
         parse_env_value("-1"),
         serde_yaml::Value::Number((-1i64).into())
     );
-    assert_eq!(
-        parse_env_value("0"),
-        serde_yaml::Value::Number(0i64.into())
-    );
+    assert_eq!(parse_env_value("0"), serde_yaml::Value::Number(0i64.into()));
 }
 
 #[test]
@@ -219,7 +217,11 @@ fn test_load_env_overrides_bool_parsing() {
     let result = load_env_overrides();
     std::env::remove_var("D3VX_AUTO_COMMIT");
 
-    assert!(result["git"].as_mapping().and_then(|m| m.get(&serde_yaml::Value::String("auto_commit".into()))).and_then(|v| v.as_bool()).unwrap_or(false));
+    assert!(result["git"]
+        .as_mapping()
+        .and_then(|m| m.get(&serde_yaml::Value::String("auto_commit".into())))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false));
 }
 
 #[test]
@@ -250,7 +252,9 @@ fn test_load_env_overrides_anthropic_base_url() {
     std::env::remove_var("D3VX_ANTHROPIC_BASE_URL");
 
     assert_eq!(
-        result["providers"]["configs"]["anthropic"]["base_url"].as_str().unwrap(),
+        result["providers"]["configs"]["anthropic"]["base_url"]
+            .as_str()
+            .unwrap(),
         "http://localhost:8080"
     );
 }

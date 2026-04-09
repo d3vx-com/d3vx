@@ -41,7 +41,10 @@ impl std::fmt::Debug for TuiOptions {
             .field("session_id", &self.session_id)
             .field("ui_mode", &self.ui_mode)
             .field("stream_out", &self.stream_out)
-            .field("dashboard", &self.dashboard.as_ref().map(|_| "Some(Dashboard)"))
+            .field(
+                "dashboard",
+                &self.dashboard.as_ref().map(|_| "Some(Dashboard)"),
+            )
             .field("resume", &self.resume)
             .finish_non_exhaustive()
     }

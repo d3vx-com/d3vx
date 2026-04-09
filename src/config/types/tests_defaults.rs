@@ -1,7 +1,9 @@
 //! Tests for config defaults module
 
-use crate::config::defaults::{default_config, get_project_config_dir, get_project_config_path, ENV_VAR_MAP};
 use super::UiMode;
+use crate::config::defaults::{
+    default_config, get_project_config_dir, get_project_config_path, ENV_VAR_MAP,
+};
 
 #[test]
 fn test_default_config_is_complete() {
@@ -50,8 +52,14 @@ fn test_default_config_pipeline_concurrency() {
 #[test]
 fn test_default_config_permissions() {
     let config = default_config();
-    assert!(config.permissions.auto_approve.contains(&"Read".to_string()));
-    assert!(config.permissions.require_approval.contains(&"Bash".to_string()));
+    assert!(config
+        .permissions
+        .auto_approve
+        .contains(&"Read".to_string()));
+    assert!(config
+        .permissions
+        .require_approval
+        .contains(&"Bash".to_string()));
     assert!(!config.permissions.trust_mode);
 }
 

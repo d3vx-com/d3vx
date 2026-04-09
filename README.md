@@ -210,11 +210,11 @@ You can use d3vx today if you want an experimental but serious AI coding TUI wit
 
 ## License
 
-d3vx is provided under the **PolyForm Noncommercial** license with a **commercial permission exception**.
+d3vx is provided under a **source-available noncommercial license** with a **commercial permission requirement**.
 
-- **Personal, educational, and research use**: Free to use, modify, and distribute
+- **Personal, educational, research, and other noncommercial use**: Free to use, modify, and distribute
 - **Commercial / business use**: **Requires prior written permission** from the copyright holder
 
 This includes any use in commercial products, SaaS offerings, or for-profit deployments.
 
-See [LICENSE](LICENSE) for the full text. For commercial licensing inquiries, contact the project maintainers.
+This is **not OSI open source** because commercial use is restricted. See [LICENSE](LICENSE) for the full text. For commercial licensing inquiries, contact the project maintainers.

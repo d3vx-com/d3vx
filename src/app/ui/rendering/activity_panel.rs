@@ -277,6 +277,14 @@ impl App {
             return current_line;
         }
 
+        // Use the summary area width for truncation — fall back to 40 if unknown
+        let max_task_chars = self
+            .layout
+            .last_activity_rect
+            .map(|r| r.width.saturating_sub(14) as usize) // "- > icon ... [Xm Ys]" overhead
+            .unwrap_or(28)
+            .max(12);
+
         summary_lines.push(Line::from(vec![Span::styled(
             format!("Agents ({})", self.agents.inline_agents.len()),
             Style::default()
@@ -296,6 +304,8 @@ impl App {
                 Style::default().fg(self.ui.theme.ui.text)
             };
 
+            let short_task = truncate_to_words(&agent.task, max_task_chars);
+
             self.layout.activity_agent_y_positions.push(current_line);
             summary_lines.push(Line::from(vec![
                 Span::styled(
@@ -303,7 +313,7 @@ impl App {
                     Style::default().fg(self.ui.theme.brand),
                 ),
                 Span::styled(icon, Style::default().fg(color)),
-                Span::styled(agent.task.clone(), task_style),
+                Span::styled(short_task, task_style),
                 Span::styled(
                     format!(" [{}]", agent.elapsed()),
                     Style::default().fg(self.ui.theme.ui.text_dim),
@@ -357,5 +367,68 @@ fn format_elapsed(start: std::time::Instant) -> String {
         format!("{}s", secs)
     } else {
         format!("{}m{}s", secs / 60, secs % 60)
+    }
+}
+
+/// Truncate a task description to 2-3 words that fit within `max_chars`.
+///
+/// Strategy: take whole words until we'd exceed the budget, then append "..".
+/// Falls back to hard-char truncation if the first word itself is too long.
+fn truncate_to_words(task: &str, max_chars: usize) -> String {
+    if task.len() <= max_chars {
+        return task.to_string();
+    }
+
+    let mut used = 0;
+    let mut words: Vec<&str> = Vec::new();
+    for word in task.split_whitespace() {
+        // +1 for the space between words (except before the first)
+        let needed = word.len() + if words.is_empty() { 0 } else { 1 };
+        if used + needed > max_chars.saturating_sub(2) {
+            // Reserve 2 chars for ".."
+            break;
+        }
+        words.push(word);
+        used += needed;
+    }
+
+    if words.is_empty() {
+        // First word is too long — hard-truncate it
+        format!("{}..", &task[..max_chars.saturating_sub(2).max(1)])
+    } else {
+        format!("{}..", words.join(" "))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate_to_words_short_enough() {
+        assert_eq!(truncate_to_words("Fix bug", 20), "Fix bug");
+    }
+
+    #[test]
+    fn test_truncate_to_words_truncates() {
+        assert_eq!(
+            truncate_to_words("Fix the authentication bug in the login module", 18),
+            "Fix the.."
+        );
+    }
+
+    #[test]
+    fn test_truncate_to_words_single_long_word() {
+        assert_eq!(truncate_to_words("superlongwordthatdoesnotfit", 10), "superlon..");
+    }
+
+    #[test]
+    fn test_truncate_to_words_exact_fit() {
+        assert_eq!(truncate_to_words("Fix auth", 8), "Fix auth");
+    }
+
+    #[test]
+    fn test_truncate_to_words_two_words_then_dot() {
+        assert_eq!(truncate_to_words("Refactor the entire authentication flow", 16), "Refactor the..");
     }
 }

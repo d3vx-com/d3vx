@@ -48,10 +48,13 @@ mod tests {
         let db = std::sync::Arc::new(parking_lot::Mutex::new(
             crate::store::Database::in_memory().unwrap(),
         ));
-        let dash = Dashboard::new(DashboardConfig {
-            enabled: true,
-            ..Default::default()
-        }, db);
+        let dash = Dashboard::new(
+            DashboardConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            db,
+        );
 
         let mut rx = dash.subscribe();
         dash.broadcast(DashboardEvent::TaskCompleted {

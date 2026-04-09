@@ -1,9 +1,9 @@
-# License — PolyForm Noncommercial + Commercial Permission Exception
+# License — Source-Available Noncommercial License
 
 ## 1. Overview
 
 This license grants broad rights for personal, educational, research, and
-open-source use of **d3vx** (the "Work"), while reserving commercial use
+other noncommercial use of **d3vx** (the "Work"), while reserving commercial use
 for licensed parties.
 
 ## 2. Noncommercial Rights
@@ -14,7 +14,7 @@ You may freely **use**, **modify**, and **distribute** this Work for any
 - Personal learning and experimentation
 - Academic education and research
 - Non-profit organizational use
-- Open-source contribution
+- Public source code contribution
 
 ## 3. Commercial Use — Permission Required
 
@@ -30,12 +30,13 @@ This includes but is not limited to:
 - Wrapping the Work as a managed service, SaaS, or hosted API
 - Incorporating the Work into a proprietary software distribution
 
-## 4. Obtaining a Commercial License
+## 4. Obtaining a Commercial License or Revenue-Sharing Agreement
 
 To request permission for commercial use, contact the copyright holder
 through the project's official communication channels. Permission may be
-granted, denied, or subject to specific conditions at the sole discretion
-of the copyright holder.
+granted, denied, or made subject to specific conditions, including a
+commercial license fee, revenue-sharing arrangement, attribution, or other
+terms, at the sole discretion of the copyright holder.
 
 ## 5. No Sublicensing
 

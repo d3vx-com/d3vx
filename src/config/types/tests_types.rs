@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use super::types_mcp::McpServer;
 use super::types_notifications::TelegramConfig;
-use super::{PreCommitConfig, UiMode, NotificationsConfig};
+use super::{NotificationsConfig, PreCommitConfig, UiMode};
 
 // =========================================================================
 // UiMode tests
@@ -19,7 +19,12 @@ fn test_ui_mode_default_is_chat() {
 
 #[test]
 fn test_ui_mode_serialization_roundtrip() {
-    let modes = vec![UiMode::Chat, UiMode::Kanban, UiMode::List, UiMode::Suggestion];
+    let modes = vec![
+        UiMode::Chat,
+        UiMode::Kanban,
+        UiMode::List,
+        UiMode::Suggestion,
+    ];
     for mode in &modes {
         let yaml = serde_yaml::to_string(mode).unwrap();
         let parsed: UiMode = serde_yaml::from_str(&yaml).unwrap();
@@ -70,12 +75,42 @@ fn test_pipeline_phase_model_serialization() {
 #[test]
 fn test_pipeline_config_skip_serializing_none() {
     let phases = super::PipelinePhases {
-        research: super::PipelinePhase { enabled: true, max_retries: 3, model: None, timeout_ms: None },
-        plan: super::PipelinePhase { enabled: true, max_retries: 3, model: None, timeout_ms: None },
-        implement: super::PipelinePhase { enabled: true, max_retries: 3, model: None, timeout_ms: None },
-        review: super::PipelinePhase { enabled: true, max_retries: 1, model: None, timeout_ms: None },
-        docs: super::PipelinePhase { enabled: true, max_retries: 1, model: None, timeout_ms: None },
-        learn: super::PipelinePhase { enabled: true, max_retries: 1, model: None, timeout_ms: None },
+        research: super::PipelinePhase {
+            enabled: true,
+            max_retries: 3,
+            model: None,
+            timeout_ms: None,
+        },
+        plan: super::PipelinePhase {
+            enabled: true,
+            max_retries: 3,
+            model: None,
+            timeout_ms: None,
+        },
+        implement: super::PipelinePhase {
+            enabled: true,
+            max_retries: 3,
+            model: None,
+            timeout_ms: None,
+        },
+        review: super::PipelinePhase {
+            enabled: true,
+            max_retries: 1,
+            model: None,
+            timeout_ms: None,
+        },
+        docs: super::PipelinePhase {
+            enabled: true,
+            max_retries: 1,
+            model: None,
+            timeout_ms: None,
+        },
+        learn: super::PipelinePhase {
+            enabled: true,
+            max_retries: 1,
+            model: None,
+            timeout_ms: None,
+        },
     };
     let config = super::PipelineConfig {
         phases,
@@ -124,7 +159,10 @@ fn test_git_config_defaults() {
         sign_commits: false,
         pre_commit_hooks: pre_commit.clone(),
     };
-    assert!(matches!(git.pre_commit_hooks, PreCommitConfig { format: true, .. }));
+    assert!(matches!(
+        git.pre_commit_hooks,
+        PreCommitConfig { format: true, .. }
+    ));
 
     // Roundtrip
     let yaml = serde_yaml::to_string(&git).unwrap();
@@ -196,7 +234,10 @@ fn test_providers_config_with_configs() {
             max_retries: None,
         },
     );
-    let pc = ProvidersConfig { fallback_chain: None, configs: Some(configs) };
+    let pc = ProvidersConfig {
+        fallback_chain: None,
+        configs: Some(configs),
+    };
     assert!(pc.configs.as_ref().unwrap().contains_key("openai"));
 }
 

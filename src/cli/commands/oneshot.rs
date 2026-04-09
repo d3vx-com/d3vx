@@ -31,12 +31,22 @@ async fn handle_auto_setup_if_needed() -> bool {
     if status.is_first_run {
         println!();
         println!("  \x1b[1mWelcome to d3vx!\x1b[0m The autonomous software engineering CLI.\n");
-        println!("  \x1b[90mNo config found at {}\x1b[0m", crate::config::defaults::get_global_config_path());
+        println!(
+            "  \x1b[90mNo config found at {}\x1b[0m",
+            crate::config::defaults::get_global_config_path()
+        );
     } else if status.needs_api_key_setup {
         println!();
         println!("  \x1b[1mAPI key not configured\x1b[0m for the current provider.\n");
-        println!("  Your config at {} exists but the API key is missing.", crate::config::defaults::get_global_config_path());
-        println!("  Provider: \x1b[1m{}\x1b[0m, expected env: \x1b[1m{}\x1b[0m", status.missing_provider.as_deref().unwrap_or("unknown"), status.provider_api_key_env);
+        println!(
+            "  Your config at {} exists but the API key is missing.",
+            crate::config::defaults::get_global_config_path()
+        );
+        println!(
+            "  Provider: \x1b[1m{}\x1b[0m, expected env: \x1b[1m{}\x1b[0m",
+            status.missing_provider.as_deref().unwrap_or("unknown"),
+            status.provider_api_key_env
+        );
     }
 
     println!("  {}\n", "─".repeat(50));
@@ -78,7 +88,10 @@ fn try_start_dashboard() -> Option<Dashboard> {
     };
 
     let dashboard = Dashboard::new(
-        DashboardConfig { enabled: true, ..Default::default() },
+        DashboardConfig {
+            enabled: true,
+            ..Default::default()
+        },
         db.clone(),
     );
 

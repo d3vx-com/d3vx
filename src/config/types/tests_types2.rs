@@ -1,8 +1,8 @@
 //! Tests for config types: sandbox, roundtrip, and misc
 //! (Split from tests_types.rs to stay under 300 lines)
 
-use serde_yaml;
 use super::types_sandbox::{FilesystemRestriction, NetworkRestriction, SandboxConfig, SandboxMode};
+use serde_yaml;
 
 // =========================================================================
 // Sandbox config tests
@@ -18,7 +18,11 @@ fn test_sandbox_mode_serialization() {
 
 #[test]
 fn test_sandbox_mode_all_variants() {
-    for mode in [SandboxMode::Native, SandboxMode::Restricted, SandboxMode::Disabled] {
+    for mode in [
+        SandboxMode::Native,
+        SandboxMode::Restricted,
+        SandboxMode::Disabled,
+    ] {
         let yaml = serde_yaml::to_string(&mode).unwrap();
         let parsed: SandboxMode = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(mode, parsed);
@@ -90,7 +94,7 @@ fn test_d3vx_config_full_roundtrip() {
 
 #[test]
 fn test_static_default_config_matches_builder() {
-    use crate::config::defaults::{DEFAULT_CONFIG, default_config};
+    use crate::config::defaults::{default_config, DEFAULT_CONFIG};
     assert_eq!(&*DEFAULT_CONFIG, &default_config());
 }
 

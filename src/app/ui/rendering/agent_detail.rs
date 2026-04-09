@@ -63,13 +63,21 @@ impl App {
             agent.task.clone()
         };
 
+        // Truncate header to fit the detail panel width (leave room for icon + padding)
+        let max_header = inner.width.saturating_sub(6) as usize;
+        let display_label = if task_label.len() > max_header {
+            format!("{}..", &task_label[..max_header.saturating_sub(2)])
+        } else {
+            task_label
+        };
+
         detail_lines.push(Line::from(vec![
             Span::styled(
                 format!("{} ", status_icon),
                 Style::default().fg(status_color),
             ),
             Span::styled(
-                task_label,
+                display_label,
                 Style::default()
                     .fg(self.ui.theme.brand)
                     .add_modifier(Modifier::BOLD),

@@ -8,7 +8,9 @@
 use anyhow::Result;
 
 use crate::cli::commands::daemon::{process_running, read_daemon_pid};
-use crate::cli::commands::helpers::{command_version, doctor_status, free_disk_mb, DoctorRuntimeContext};
+use crate::cli::commands::helpers::{
+    command_version, doctor_status, free_disk_mb, DoctorRuntimeContext,
+};
 use crate::config::{get_provider_config, load_config, LoadConfigOptions};
 use crate::providers::SUPPORTED_PROVIDERS;
 
@@ -102,9 +104,7 @@ fn check_worktree_support(cwd: &str) -> String {
 
 fn check_disk(cwd: &str) -> String {
     match free_disk_mb(cwd) {
-        Some(mb) if mb >= MIN_DISK_MB => {
-            doctor_status("Disk Space", "OK", format!("{mb} MB free"))
-        }
+        Some(mb) if mb >= MIN_DISK_MB => doctor_status("Disk Space", "OK", format!("{mb} MB free")),
         Some(mb) => doctor_status(
             "Disk Space",
             "WARN",
@@ -138,7 +138,11 @@ fn check_daemon() -> String {
             "WARN",
             format!("stale pid file (pid {pid}) — run: d3vx daemon start"),
         ),
-        None => doctor_status("Daemon", "INFO", "not running (optional for background tasks)"),
+        None => doctor_status(
+            "Daemon",
+            "INFO",
+            "not running (optional for background tasks)",
+        ),
     }
 }
 
@@ -183,14 +187,22 @@ pub(crate) fn build_doctor_report(context: DoctorRuntimeContext) -> Result<Strin
         out.push_str(&doctor_status(
             "TUI DB",
             if connected { "OK" } else { "WARN" },
-            if connected { "connected" } else { "not connected" },
+            if connected {
+                "connected"
+            } else {
+                "not connected"
+            },
         ));
     }
     if let Some(initialized) = context.provider_initialized {
         out.push_str(&doctor_status(
             "TUI Provider",
             if initialized { "OK" } else { "WARN" },
-            if initialized { "initialized" } else { "not initialized" },
+            if initialized {
+                "initialized"
+            } else {
+                "not initialized"
+            },
         ));
     }
 

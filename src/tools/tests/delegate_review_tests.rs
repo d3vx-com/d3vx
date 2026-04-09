@@ -10,10 +10,7 @@ async fn valid_task_description_returns_success() {
     let ctx = ToolContext::default();
 
     let r = tool
-        .execute(
-            json!({"task_description": "implement login flow"}),
-            &ctx,
-        )
+        .execute(json!({"task_description": "implement login flow"}), &ctx)
         .await;
 
     assert!(!r.is_error);

@@ -1,8 +1,10 @@
 //! Token estimation tests
 
-use super::estimator::{estimate_for_code, estimate_for_content, estimate_for_json, estimate_tokens_for_text};
+use super::estimator::{
+    estimate_for_code, estimate_for_content, estimate_for_json, estimate_tokens_for_text,
+};
 use super::model_limits::{get_default_limits, get_model_limits, ModelLimits};
-use super::overflow::{ContextOverflowCheck, COMPACTION_BUFFER, is_context_overflow};
+use super::overflow::{is_context_overflow, ContextOverflowCheck, COMPACTION_BUFFER};
 
 // ── Estimator Tests ──────────────────────────────────────────
 
@@ -48,7 +50,10 @@ fn test_code_estimation() {
     let code = "fn main() { println!(\"Hello\"); }";
     let text_tokens = estimate_tokens_for_text(code);
     let code_tokens = estimate_for_code(code);
-    assert!(code_tokens <= text_tokens, "code tokens ({code_tokens}) should be <= text tokens ({text_tokens})");
+    assert!(
+        code_tokens <= text_tokens,
+        "code tokens ({code_tokens}) should be <= text tokens ({text_tokens})"
+    );
     assert!(code_tokens > 0);
 }
 
@@ -60,10 +65,14 @@ fn test_code_estimation_empty() {
 #[test]
 fn test_json_estimation() {
     // JSON uses chars/token × 0.9, so more tokens (repetitive structure)
-    let long_json = r#"{"users": [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}], "count": 2}"#;
+    let long_json =
+        r#"{"users": [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}], "count": 2}"#;
     let long_text = estimate_tokens_for_text(long_json);
     let long_json_tokens = estimate_for_json(long_json);
-    assert!(long_json_tokens > long_text, "json tokens should be higher due to repetitive structure");
+    assert!(
+        long_json_tokens > long_text,
+        "json tokens should be higher due to repetitive structure"
+    );
 }
 
 #[test]
@@ -142,7 +151,12 @@ fn test_default_limits() {
 
 #[test]
 fn test_known_models_have_reasonable_limits() {
-    for name in ["claude-3-7-sonnet-20250219", "gpt-4o", "gpt-4o-mini", "deepseek-chat"] {
+    for name in [
+        "claude-3-7-sonnet-20250219",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "deepseek-chat",
+    ] {
         let limits = get_model_limits(name).unwrap_or_else(|| panic!("missing limits for {name}"));
         assert!(limits.context >= 50_000, "{name} context too small");
         assert!(limits.output >= 2_000, "{name} output too small");
@@ -229,10 +243,18 @@ fn test_overflow_recommended_free_when_under() {
 
 #[test]
 fn test_is_context_overflow_helper_yes() {
-    assert!(is_context_overflow("claude-3-7-sonnet-20250219", 200_000, 10_000));
+    assert!(is_context_overflow(
+        "claude-3-7-sonnet-20250219",
+        200_000,
+        10_000
+    ));
 }
 
 #[test]
 fn test_is_context_overflow_helper_no() {
-    assert!(!is_context_overflow("claude-3-7-sonnet-20250219", 10_000, 10_000));
+    assert!(!is_context_overflow(
+        "claude-3-7-sonnet-20250219",
+        10_000,
+        10_000
+    ));
 }

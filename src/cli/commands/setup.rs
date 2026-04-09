@@ -93,8 +93,7 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
     println!("\n  \x1b[1mConfiguring: {}\x1b[0m", provider_info.name);
     println!("  Config path: {}\n", get_global_config_path());
 
-    let (default_cheap, default_standard, default_premium) =
-        provider_default_models(&selected_id);
+    let (default_cheap, default_standard, default_premium) = provider_default_models(&selected_id);
 
     let standard_model = prompt_input("Standard model", Some(&default_standard))?;
     let routing_enabled = prompt_yes_no("Enable 3-tier model routing", true)?;
@@ -114,7 +113,10 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
     let base_url = prompt_base_url(provider_info.base_url)?;
 
     // Budget configuration for cost control
-    let budget_enabled = prompt_yes_no("Enable budget enforcement (prevents runaway API costs)", true)?;
+    let budget_enabled = prompt_yes_no(
+        "Enable budget enforcement (prevents runaway API costs)",
+        true,
+    )?;
     let budget_per_session = if budget_enabled {
         let input = prompt_input("Per-session budget (USD)", Some("5.00"))?;
         input.parse::<f64>().unwrap_or(5.00)
@@ -165,12 +167,26 @@ fn print_banner() {
 
 fn prompt_base_url(default_base_url: Option<&str>) -> Result<Option<String>> {
     let default = default_base_url.unwrap_or("");
-    let input = prompt_input("Custom base URL (e.g. https://openai.api-proxy.com/v1)", if default.is_empty() { None } else { Some(default) })?;
+    let input = prompt_input(
+        "Custom base URL (e.g. https://openai.api-proxy.com/v1)",
+        if default.is_empty() {
+            None
+        } else {
+            Some(default)
+        },
+    )?;
     let trimmed = input.trim();
-    Ok(if trimmed.is_empty() { None } else { Some(trimmed.to_string()) })
+    Ok(if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    })
 }
 
-fn select_provider(arg: Option<&str>, all: &[&crate::providers::registry::ProviderInfo]) -> Result<String> {
+fn select_provider(
+    arg: Option<&str>,
+    all: &[&crate::providers::registry::ProviderInfo],
+) -> Result<String> {
     use crate::providers::SUPPORTED_PROVIDERS;
 
     if let Some(p) = arg {
@@ -185,13 +201,24 @@ fn select_provider(arg: Option<&str>, all: &[&crate::providers::registry::Provid
 
     println!("  Select your LLM provider:\n");
     for (i, info) in all.iter().enumerate() {
-        let marker = if info.id == "anthropic" { " \x1b[90m(default)\x1b[0m" } else { "" };
+        let marker = if info.id == "anthropic" {
+            " \x1b[90m(default)\x1b[0m"
+        } else {
+            ""
+        };
         let key_note = if info.requires_api_key {
             format!("needs {}", info.api_key_env)
         } else {
             "no key needed".to_string()
         };
-        println!("    {}. {:<12} {:<20} {}{}", i + 1, info.id, info.name, key_note, marker);
+        println!(
+            "    {}. {:<12} {:<20} {}{}",
+            i + 1,
+            info.id,
+            info.name,
+            key_note,
+            marker
+        );
     }
     println!("    0. Exit\n");
 
@@ -299,14 +326,14 @@ fn print_api_key_instructions(info: &crate::providers::registry::ProviderInfo) {
     println!("\n  API key setup:");
 
     let url = match info.id {
-        "anthropic"  => "https://console.anthropic.com/settings/keys",
-        "openai"     => "https://platform.openai.com/api-keys",
-        "groq"       => "https://console.groq.com/keys",
+        "anthropic" => "https://console.anthropic.com/settings/keys",
+        "openai" => "https://platform.openai.com/api-keys",
+        "groq" => "https://console.groq.com/keys",
         "openrouter" => "https://openrouter.ai/keys",
-        "xai"        => "https://console.x.ai",
-        "mistral"    => "https://console.mistral.ai/api-keys",
-        "deepseek"   => "https://platform.deepseek.com/api_keys",
-        _            => "provider's dashboard",
+        "xai" => "https://console.x.ai",
+        "mistral" => "https://console.mistral.ai/api-keys",
+        "deepseek" => "https://platform.deepseek.com/api_keys",
+        _ => "provider's dashboard",
     };
 
     println!("    1. Get your key: {url}");
@@ -352,7 +379,10 @@ fn write_project_config(d3vx_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn write_project_md(d3vx_dir: &PathBuf, detected: &crate::utils::project::DetectedProject) -> Result<()> {
+fn write_project_md(
+    d3vx_dir: &PathBuf,
+    detected: &crate::utils::project::DetectedProject,
+) -> Result<()> {
     let content = generate_project_md(detected);
     fs::write(d3vx_dir.join("project.md"), content)?;
     Ok(())

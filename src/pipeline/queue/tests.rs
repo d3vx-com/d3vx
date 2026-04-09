@@ -300,7 +300,12 @@ fn test_queue_stats_default() {
 
 #[test]
 fn test_queue_stats_clone() {
-    let stats = QueueStats { total: 5, queued: 3, in_progress: 2, ..Default::default() };
+    let stats = QueueStats {
+        total: 5,
+        queued: 3,
+        in_progress: 2,
+        ..Default::default()
+    };
     let cloned = stats.clone();
     assert_eq!(cloned.total, 5);
     assert_eq!(cloned.queued, 3);
@@ -329,7 +334,9 @@ fn test_dependency_no_deps_is_satisfied() {
 fn test_dependency_multiple_one_missing() {
     let dep = TaskDependency::new("t3", vec!["t1".to_string(), "t2".to_string()]);
     assert!(dep.check_satisfied(&["t1".to_string()]).is_err());
-    assert!(dep.check_satisfied(&["t1".to_string(), "t2".to_string()]).is_ok());
+    assert!(dep
+        .check_satisfied(&["t1".to_string(), "t2".to_string()])
+        .is_ok());
 }
 
 #[test]

@@ -651,8 +651,12 @@ mod tests {
         app.restore_parallel_batches_from_metadata(r#"{"orchestration":{"parallel_batches":[]}}"#);
         assert_eq!(app.agents.parallel_batches.len(), 1); // restore doesn't touch orchestration key
 
-        let lines = app.graph_summary_from_task_metadata(r#"{"orchestration":{"parallel_batches":[]}}"#);
-        assert!(lines.is_empty(), "Expected no lines for empty orchestration");
+        let lines =
+            app.graph_summary_from_task_metadata(r#"{"orchestration":{"parallel_batches":[]}}"#);
+        assert!(
+            lines.is_empty(),
+            "Expected no lines for empty orchestration"
+        );
     }
 
     #[test]

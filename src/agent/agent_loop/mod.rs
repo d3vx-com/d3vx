@@ -101,8 +101,11 @@ impl AgentLoop {
                     },
                 ));
                 if let Some(db) = db_for_cb {
-                    let persister_cb = crate::app::session_state_persister::SessionStatePersister
-                        ::callback(session_id_for_cb, db);
+                    let persister_cb =
+                        crate::app::session_state_persister::SessionStatePersister::callback(
+                            session_id_for_cb,
+                            db,
+                        );
                     tracker = tracker.with_state_change_callback(Arc::new(
                         move |old_state, new_state, reason| {
                             persister_cb(old_state, new_state, reason);
@@ -177,8 +180,11 @@ impl AgentLoop {
                     },
                 ));
                 if let Some(db) = db_for_cb {
-                    let persister_cb = crate::app::session_state_persister::SessionStatePersister
-                        ::callback(session_id_for_cb, db);
+                    let persister_cb =
+                        crate::app::session_state_persister::SessionStatePersister::callback(
+                            session_id_for_cb,
+                            db,
+                        );
                     tracker = tracker.with_state_change_callback(Arc::new(
                         move |old_state, new_state, reason| {
                             persister_cb(old_state, new_state, reason);

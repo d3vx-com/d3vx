@@ -31,7 +31,12 @@ fn test_task_state_display_spot_checks() {
 fn test_from_str_roundtrip_all_states() {
     for state in TaskState::all() {
         let from_str: Result<TaskState, _> = state.to_string().parse();
-        assert_eq!(from_str.unwrap(), *state, "FromStr roundtrip failed for {:?}", state);
+        assert_eq!(
+            from_str.unwrap(),
+            *state,
+            "FromStr roundtrip failed for {:?}",
+            state
+        );
     }
 }
 
@@ -180,8 +185,11 @@ fn test_all_states_can_transition_to_failed_except_done() {
         if matches!(state, TaskState::Done | TaskState::Failed) {
             assert!(!state.can_transition_to(TaskState::Failed));
         } else {
-            assert!(state.can_transition_to(TaskState::Failed),
-                "{:?} should be able to transition to Failed", state);
+            assert!(
+                state.can_transition_to(TaskState::Failed),
+                "{:?} should be able to transition to Failed",
+                state
+            );
         }
     }
 }
@@ -193,8 +201,11 @@ fn test_all_states_have_transitions_or_are_terminal() {
         if matches!(state, TaskState::Done) {
             assert!(state.valid_transitions().is_empty());
         } else {
-            assert!(!state.valid_transitions().is_empty(),
-                "non-terminal state {:?} has no transitions", state);
+            assert!(
+                !state.valid_transitions().is_empty(),
+                "non-terminal state {:?} has no transitions",
+                state
+            );
         }
     }
 }

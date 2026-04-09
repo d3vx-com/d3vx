@@ -107,7 +107,10 @@ pub struct Dashboard {
 
 impl Dashboard {
     /// Create a new dashboard with the given configuration and database.
-    pub fn new(config: DashboardConfig, db: Arc<parking_lot::Mutex<crate::store::Database>>) -> Self {
+    pub fn new(
+        config: DashboardConfig,
+        db: Arc<parking_lot::Mutex<crate::store::Database>>,
+    ) -> Self {
         let (tx, _rx) = broadcast::channel(BROADCAST_CAPACITY);
         info!(
             "Dashboard initialized (host={}, port={}, enabled={})",
@@ -124,8 +127,7 @@ impl Dashboard {
                 ..Default::default()
             },
             Arc::new(parking_lot::Mutex::new(
-                crate::store::Database::in_memory()
-                    .expect("Failed to create dummy database"),
+                crate::store::Database::in_memory().expect("Failed to create dummy database"),
             )),
         )
     }
@@ -227,8 +229,7 @@ mod tests {
 
     fn test_db() -> Arc<parking_lot::Mutex<crate::store::Database>> {
         Arc::new(parking_lot::Mutex::new(
-            crate::store::Database::in_memory()
-                .expect("Failed to create test database"),
+            crate::store::Database::in_memory().expect("Failed to create test database"),
         ))
     }
 
@@ -375,10 +376,7 @@ mod tests {
     #[test]
     fn test_db_handle() {
         let db = test_db();
-        let dash = Dashboard::new(
-            DashboardConfig::default(),
-            db.clone(),
-        );
+        let dash = Dashboard::new(DashboardConfig::default(), db.clone());
         // Verify the handle is the same Arc
         assert!(Arc::ptr_eq(dash.db(), &db));
     }

@@ -43,7 +43,9 @@ pub async fn execute(cli: Cli) -> Result<()> {
                     // Vex mode: run in background with parallel agents
                     vex::run_vex_mode(query, &cli).await
                 } else {
-                    anyhow::bail!("--vex requires a task description. Usage: d3vx --vex \"task description\"");
+                    anyhow::bail!(
+                        "--vex requires a task description. Usage: d3vx --vex \"task description\""
+                    );
                 }
             } else if let Some(query) = &cli.query {
                 oneshot::execute_oneshot(query, &cli).await
@@ -99,10 +101,16 @@ async fn execute_command(cmd: &CliCommand, _cli: &Cli) -> Result<()> {
         CliCommand::Batch { action } => stubs::execute_batch(action).await,
         CliCommand::Docs { action } => stubs::execute_docs(action).await,
         CliCommand::Autonomous { action } => stubs::execute_autonomous(action).await,
-        CliCommand::Task { task_id, cwd, worktree } => {
+        CliCommand::Task {
+            task_id,
+            cwd,
+            worktree,
+        } => {
             let task_id = task_id.clone();
             let cwd = cwd.clone().unwrap_or_else(|| ".".to_string());
-            let worktree = worktree.clone().unwrap_or_else(|| format!(".d3vx/worktrees/{}", task_id));
+            let worktree = worktree
+                .clone()
+                .unwrap_or_else(|| format!(".d3vx/worktrees/{}", task_id));
             vex::run_task_detached(task_id, cwd, worktree).await
         }
     }

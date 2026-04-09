@@ -175,17 +175,22 @@ impl App {
                         && y >= activity_rect.y
                         && y < activity_rect.y + activity_rect.height
                     {
-                        // Calculate click position relative to content area (summary_area already has padding built in)
+                        // Calculate click position relative to content area
                         let content_y = (y - activity_rect.y) as usize;
                         // Adjust for scroll offset
                         let adjusted_y = content_y + self.ui.activity_scroll_offset;
 
-                        // Match against activity_agent_y_positions
-                        // Index 0 in activity_agent_y_positions is now "Main Session" (usize::MAX)
-                        for (idx, &agent_y) in
-                            self.layout.activity_agent_y_positions.iter().enumerate()
-                        {
-                            if adjusted_y == agent_y {
+                        // Range-based agent row matching:
+                        // Each stored Y marks the *start* of that row. A click hits
+                        // a row if it's on or after that row's Y, but before the
+                        // next row's Y (or the end of the list).
+                        let agent_positions = &self.layout.activity_agent_y_positions;
+                        for (idx, &start_y) in agent_positions.iter().enumerate() {
+                            let next_y = agent_positions
+                                .get(idx + 1)
+                                .copied()
+                                .unwrap_or(usize::MAX);
+                            if adjusted_y >= start_y && adjusted_y < next_y {
                                 if idx == 0 {
                                     self.agents.selected_inline_agent = Some(usize::MAX);
                                 } else if idx - 1 < self.agents.inline_agents.len() {
@@ -197,10 +202,16 @@ impl App {
                         }
 
                         let mut found_diff = false;
-                        for (idx, &diff_y) in
-                            self.layout.activity_diff_y_positions.iter().enumerate()
-                        {
-                            if adjusted_y == diff_y && idx < self.git_changes.len() {
+                        let diff_positions = &self.layout.activity_diff_y_positions;
+                        for (idx, &start_y) in diff_positions.iter().enumerate() {
+                            let next_y = diff_positions
+                                .get(idx + 1)
+                                .copied()
+                                .unwrap_or(usize::MAX);
+                            if adjusted_y >= start_y
+                                && adjusted_y < next_y
+                                && idx < self.git_changes.len()
+                            {
                                 self.select_git_change(idx);
                                 found_diff = true;
                                 break;

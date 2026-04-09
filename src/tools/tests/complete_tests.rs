@@ -10,10 +10,7 @@ async fn valid_summary_returns_success() {
     let ctx = ToolContext::default();
 
     let r = tool
-        .execute(
-            json!({"summary": "Added tests and linting passed"}),
-            &ctx,
-        )
+        .execute(json!({"summary": "Added tests and linting passed"}), &ctx)
         .await;
 
     assert!(!r.is_error);

@@ -22,10 +22,6 @@ pub mod doom_loop;
 #[cfg(test)]
 mod doom_loop_tests;
 pub mod file_change_log;
-#[cfg(test)]
-mod specialists_tests;
-#[cfg(test)]
-mod step_controller_tests;
 pub mod guard;
 pub mod logger;
 pub mod orchestrator;
@@ -33,8 +29,12 @@ pub mod prompt;
 pub mod rules;
 pub mod session;
 pub mod specialists;
+#[cfg(test)]
+mod specialists_tests;
 pub mod state;
 pub mod step_controller;
+#[cfg(test)]
+mod step_controller_tests;
 pub mod subagent;
 pub mod tool_coordinator;
 

@@ -216,10 +216,7 @@ fn send_notification(
 ///
 /// This is a standalone function (not a method) to keep the bridge
 /// decoupled from the orchestrator's concrete type.
-pub async fn execute_outcome(
-    orchestrator: &PipelineOrchestrator,
-    outcome: &ReactionOutcome,
-) {
+pub async fn execute_outcome(orchestrator: &PipelineOrchestrator, outcome: &ReactionOutcome) {
     match outcome {
         ReactionOutcome::AutoFixRequested { task_id, reason } => {
             if let Some(id) = task_id {

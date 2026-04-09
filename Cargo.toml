@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["d3vx team"]
 description = "High-performance autonomous software engineering CLI"
-license = "MIT"
+license-file = "LICENSE"
 repository = "https://github.com/d3vx/d3vx-terminal"
 
 [features]

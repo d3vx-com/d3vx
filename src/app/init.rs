@@ -191,9 +191,7 @@ impl App {
         if let Some(events) = agent_events {
             // Wire dashboard bridge if dashboard is available
             if let Some(ref dash) = dashboard {
-                let session = session_id
-                    .clone()
-                    .unwrap_or_else(|| "unknown".to_string());
+                let session = session_id.clone().unwrap_or_else(|| "unknown".to_string());
                 let bridge_rx = events.resubscribe();
                 crate::app::dashboard_bridge::DashboardBridge::spawn(
                     dash.clone(),
@@ -360,7 +358,10 @@ impl App {
                     if sessions.is_empty() {
                         info!("No previous sessions found for --resume");
                     } else {
-                        info!("Opening session picker for --resume ({} sessions)", sessions.len());
+                        info!(
+                            "Opening session picker for --resume ({} sessions)",
+                            sessions.len()
+                        );
                         app.session_picker = Some(crate::ui::widgets::SessionPicker::new(sessions));
                         app.ui.mode = AppMode::SessionPicker;
                     }

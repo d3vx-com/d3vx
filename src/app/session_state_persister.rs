@@ -5,8 +5,8 @@
 
 use tracing::{debug, warn};
 
-use crate::agent::state::AgentState;
 use crate::agent::state::types::StateTransitionReason;
+use crate::agent::state::AgentState;
 use crate::store::session::SessionState;
 
 /// Maps an AgentState to the corresponding SessionState.

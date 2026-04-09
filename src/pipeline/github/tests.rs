@@ -1,6 +1,6 @@
 //! Integration tests for GitHub webhook handling
 
-use crate::pipeline::github::{GitHubEvent, GitHubIntegration, CIStatus};
+use crate::pipeline::github::{CIStatus, GitHubEvent, GitHubIntegration};
 use crate::pipeline::phases::Priority;
 
 #[test]
