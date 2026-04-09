@@ -6,13 +6,105 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Paragraph, Wrap};
 
 use crate::app::App;
-use crate::ipc::MessageRole;
-use crate::ui::symbols::{AI_INDICATOR, SHELL_INDICATOR, USER_INDICATOR};
+use crate::ipc::{MessageRole, ToolCall, ToolStatus};
+use crate::ui::symbols::{AI_INDICATOR, SHELL_INDICATOR, STATUS, USER_INDICATOR};
 use crate::utils::format::format_elapsed;
 
 use crate::app::ui::helpers::{braille_frame, MUTED_WHITE};
 
 impl App {
+    /// Render a tool call inline (Claude Code style)
+    fn render_inline_tool(&self, lines: &mut Vec<Line<'_>>, tool: &ToolCall) {
+        let theme = &self.ui.theme;
+
+        // Tool header line with status indicator
+        let status_icon = match tool.status {
+            ToolStatus::Pending => "○",
+            ToolStatus::Running => "◐",
+            ToolStatus::Completed => STATUS.success,
+            ToolStatus::Error => STATUS.error,
+            ToolStatus::WaitingApproval => "○",
+        };
+
+        let status_color = match tool.status {
+            ToolStatus::Pending => theme.ui.text_dim,
+            ToolStatus::Running => theme.brand_secondary,
+            ToolStatus::Completed => theme.state.success,
+            ToolStatus::Error => theme.state.error,
+            ToolStatus::WaitingApproval => theme.ui.text_dim,
+        };
+
+        // Truncate long tool names for display
+        let tool_name = if tool.name.len() > 50 {
+            format!("{}...", &tool.name[..47])
+        } else {
+            tool.name.clone()
+        };
+
+        // Build header with elapsed time if available
+        let header_text = if let Some(elapsed) = tool.elapsed {
+            let elapsed_str = if elapsed < 1000 {
+                format!("{}ms", elapsed)
+            } else {
+                format!("{:.1}s", elapsed as f64 / 1000.0)
+            };
+            format!("{} {} ({})", status_icon, tool_name, elapsed_str)
+        } else {
+            format!("{} {}", status_icon, tool_name)
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("◇", Style::default().fg(theme.ui.text_dim)),
+            Span::styled(" ", Style::default()),
+            Span::styled(
+                header_text,
+                Style::default()
+                    .fg(status_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+
+        // Show tool input (truncated)
+        if !tool.input.is_null() {
+            let input_str = tool.input.to_string();
+            let truncated = if input_str.len() > 100 {
+                format!("{}...", &input_str[..97])
+            } else {
+                input_str
+            };
+            lines.push(Line::from(vec![
+                Span::styled("     ", Style::default()),
+                Span::styled(
+                    truncated,
+                    Style::default()
+                        .fg(theme.ui.text_dim)
+                        .add_modifier(Modifier::ITALIC),
+                ),
+            ]));
+        }
+
+        // Show tool output if available (truncated)
+        if let Some(ref output) = tool.output {
+            let truncated = if output.len() > 150 {
+                format!("{}...", &output[..147])
+            } else {
+                output.clone()
+            };
+            lines.push(Line::from(vec![
+                Span::styled("     ", Style::default()),
+                Span::styled(
+                    truncated,
+                    Style::default().fg(match tool.status {
+                        ToolStatus::Error => theme.state.error,
+                        ToolStatus::WaitingApproval => theme.ui.text_dim,
+                        _ => theme.ui.text,
+                    }),
+                ),
+            ]));
+        }
+    }
+
     /// Render messages
     pub fn render_messages(&mut self, area: Rect) -> Paragraph<'_> {
         let mut lines: Vec<Line<'_>> = Vec::new();
@@ -54,7 +146,11 @@ impl App {
                 lines.push(line);
             }
 
-            // Tool calls are shown in the activity panel, not in chat
+            // Inline tool calls (like Claude Code)
+            for tool in &msg.tool_calls {
+                self.render_inline_tool(lines.as_mut(), tool);
+            }
+
             lines.push(Line::raw("")); // Spacing
         }
 
