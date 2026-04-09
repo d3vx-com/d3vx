@@ -87,6 +87,7 @@ impl App {
                 self.add_system_message(&format!("Error: {}", msg));
             }
         }
+        self.needs_redraw = true;
         Ok(())
     }
 

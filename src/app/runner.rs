@@ -150,8 +150,11 @@ impl App {
                 }
             }
 
-            // Render
-            terminal.draw(|f| self.render(f))?;
+            // Render only if something changed
+            if self.needs_redraw {
+                terminal.draw(|f| self.render(f))?;
+                self.needs_redraw = false;
+            }
         }
 
         // Final save on exit for all active agents

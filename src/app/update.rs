@@ -115,6 +115,15 @@ impl App {
             }
 
             self.last_orchestrator_refresh = Instant::now();
+
+            // Cache subagent count for render (avoids block_in_place in render path)
+            self.cached_subagent_count = tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(self.subagents.list())
+                    .iter()
+                    .filter(|a| a.status == crate::agent::SubAgentStatus::Running)
+                    .count()
+            });
         }
 
         // Update thinking state if orchestrator is active
@@ -153,6 +162,9 @@ impl App {
 
         // Standalone tool updates
         let _ = self.poll_tool_executions();
+
+        // Request redraw if state changed
+        self.needs_redraw = true;
     }
 
     /// Poll for completed tools (placeholder)

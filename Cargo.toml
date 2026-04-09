@@ -94,6 +94,9 @@ tree-sitter-python = "0.21"
 # Directory paths
 dirs = "5.0"
 
+# OS keychain for secure API key storage
+keyring = "3"
+
 # Lazy static initialization
 once_cell = "1.20"
 

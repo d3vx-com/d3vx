@@ -66,13 +66,8 @@ impl App {
                 .map(|s| s.elapsed().as_secs())
                 .unwrap_or(0);
 
-            let subagent_count = tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::current();
-                rt.block_on(self.subagents.list())
-                    .iter()
-                    .filter(|a| a.status == crate::agent::SubAgentStatus::Running)
-                    .count()
-            });
+            // Use cached subagent count (updated in update loop)
+            let subagent_count = self.cached_subagent_count;
 
             // Build thinking status text
             let mut status_parts = Vec::new();

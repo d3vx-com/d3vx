@@ -304,6 +304,8 @@ impl App {
 
             animation_frame: 0,
             last_update: Instant::now(),
+            needs_redraw: true,
+            cached_subagent_count: 0,
             registry,
             last_git_refresh: Instant::now(),
             last_workspace_refresh: Instant::now(),

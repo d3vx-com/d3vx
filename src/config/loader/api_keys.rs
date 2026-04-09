@@ -1,6 +1,7 @@
 //! API key resolution and provider configuration lookup
 
 use super::super::types::D3vxConfig;
+use crate::config::keychain;
 use crate::providers::SUPPORTED_PROVIDERS;
 use std::env;
 use tracing::{debug, warn};
@@ -11,6 +12,7 @@ use tracing::{debug, warn};
 /// 1. Registry-defined environment variable (canonical source)
 /// 2. Custom env var from provider config (api_key_env field)
 /// 3. Generic pattern: PROVIDERNAME_API_KEY
+/// 4. OS keychain (stored during `d3vx setup`)
 pub fn get_api_key(provider_name: &str, config: &D3vxConfig) -> Option<String> {
     let mut env_vars_to_check: Vec<String> = Vec::new();
 
@@ -33,6 +35,7 @@ pub fn get_api_key(provider_name: &str, config: &D3vxConfig) -> Option<String> {
         env_vars_to_check.push(generic_key);
     }
 
+    // 1. Check environment variables first
     for env_var in env_vars_to_check {
         if let Ok(key) = env::var(&env_var) {
             if !key.is_empty() {
@@ -40,6 +43,12 @@ pub fn get_api_key(provider_name: &str, config: &D3vxConfig) -> Option<String> {
                 return Some(key);
             }
         }
+    }
+
+    // 2. Fall back to OS keychain
+    if let Some(key) = keychain::get_key(provider_name) {
+        debug!("Found API key for {} from OS keychain", provider_name);
+        return Some(key);
     }
 
     warn!("No API key found for provider {}", provider_name);

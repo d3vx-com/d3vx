@@ -150,7 +150,7 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
     }
 
     write_global_config(&yaml)?;
-    print_api_key_instructions(provider_info);
+    prompt_and_store_api_key(provider_info)?;
     print_next_steps(provider_info);
 
     Ok(())
@@ -314,16 +314,25 @@ fn write_global_config(yaml: &str) -> Result<()> {
     Ok(())
 }
 
-fn print_api_key_instructions(info: &crate::providers::registry::ProviderInfo) {
+/// Prompt the user for an API key and store it in the OS keychain.
+fn prompt_and_store_api_key(info: &crate::providers::registry::ProviderInfo) -> Result<()> {
     if info.id == "ollama" {
         println!("\n  Ollama next steps:");
         println!("    1. Install Ollama: https://ollama.ai");
         println!("    2. Pull a model:   ollama pull {}", info.default_model);
         println!("    3. Start server:   ollama serve");
-        return;
+        return Ok(());
     }
 
-    println!("\n  API key setup:");
+    if info.api_key_env.is_empty() {
+        return Ok(());
+    }
+
+    // Check if key already exists in keychain
+    if crate::config::keychain::has_key(&info.id) {
+        println!("\n  \x1b[32m✔\x1b[0m API key already stored in OS keychain for {}", info.id);
+        return Ok(());
+    }
 
     let url = match info.id {
         "anthropic" => "https://console.anthropic.com/settings/keys",
@@ -336,25 +345,45 @@ fn print_api_key_instructions(info: &crate::providers::registry::ProviderInfo) {
         _ => "provider's dashboard",
     };
 
-    println!("    1. Get your key: {url}");
-    if !info.api_key_env.is_empty() {
-        println!("    2. Add to your shell profile (~/.zshrc or ~/.bashrc):");
-        println!("         export {}=\"your-key-here\"", info.api_key_env);
-        println!("    3. Reload:  source ~/.zshrc");
+    println!("\n  API key:");
+    println!("    Get your key: {url}");
+    println!();
+
+    let key = prompt_input(
+        &format!("Paste your {} key (hidden, stored in OS keychain)", info.api_key_env),
+        None,
+    )?;
+
+    let trimmed = key.trim();
+    if trimmed.is_empty() {
+        println!("\n  \x1b[33m!\x1b[0m Skipped — set later via:");
+        println!("    export {}=\"your-key\"", info.api_key_env);
+        println!("    or re-run: d3vx setup");
+        return Ok(());
     }
+
+    match crate::config::keychain::store_key(&info.id, trimmed) {
+        Ok(()) => {
+            println!("  \x1b[32m✔\x1b[0m Key stored securely in OS keychain");
+            println!("     You won't need to set {} again.", info.api_key_env);
+        }
+        Err(e) => {
+            println!("\n  \x1b[33m!\x1b[0m Keychain unavailable: {e}");
+            println!("    Set your key via: export {}=\"your-key\"", info.api_key_env);
+        }
+    }
+
+    Ok(())
 }
 
 fn print_next_steps(info: &crate::providers::registry::ProviderInfo) {
     println!("\n  {}", "─".repeat(46));
-    println!("  \x1b[1mYou're almost ready.\x1b[0m Run these to verify:\n");
+    println!("  \x1b[1mYou're all set.\x1b[0m Run these to verify:\n");
     println!("    d3vx doctor");
     println!("    d3vx \"add input validation to the login form\" --vex\n");
 
-    if info.id != "ollama" && !info.api_key_env.is_empty() {
-        println!(
-            "  \x1b[90mTip: set {} before running d3vx doctor\x1b[0m\n",
-            info.api_key_env
-        );
+    if info.id == "ollama" {
+        println!("  \x1b[90mMake sure Ollama is running before starting.\x1b[0m\n");
     }
 }
 
