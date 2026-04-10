@@ -87,7 +87,7 @@ impl App {
                         .direction(Direction::Horizontal)
                         .constraints([
                             Constraint::Min(0),
-                            Constraint::Length(2),
+                            Constraint::Length(1),
                             Constraint::Percentage(25),
                         ])
                         .split(content_area);

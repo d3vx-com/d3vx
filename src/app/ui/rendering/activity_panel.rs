@@ -18,7 +18,7 @@ use super::activity_tools::inline_agent_icon_color;
 impl App {
     /// Render the activity panel (right side) with tools, agents, and status
     pub(super) fn render_activity_panel(&mut self, f: &mut Frame, area: Rect) {
-        let bg_color = Color::Rgb(22, 22, 28);
+        let bg_color = Color::Reset;
         f.render_widget(Clear, area);
 
         let inner_area = Rect {
