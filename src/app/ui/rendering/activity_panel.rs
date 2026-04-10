@@ -419,7 +419,10 @@ mod tests {
 
     #[test]
     fn test_truncate_to_words_single_long_word() {
-        assert_eq!(truncate_to_words("superlongwordthatdoesnotfit", 10), "superlon..");
+        assert_eq!(
+            truncate_to_words("superlongwordthatdoesnotfit", 10),
+            "superlon.."
+        );
     }
 
     #[test]
@@ -429,6 +432,9 @@ mod tests {
 
     #[test]
     fn test_truncate_to_words_two_words_then_dot() {
-        assert_eq!(truncate_to_words("Refactor the entire authentication flow", 16), "Refactor the..");
+        assert_eq!(
+            truncate_to_words("Refactor the entire authentication flow", 16),
+            "Refactor the.."
+        );
     }
 }

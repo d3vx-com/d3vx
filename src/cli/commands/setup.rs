@@ -314,7 +314,7 @@ fn write_global_config(yaml: &str) -> Result<()> {
     Ok(())
 }
 
-/// Prompt the user for an API key and store it in the OS keychain.
+/// Prompt the user for an API key and store it in auth.json.
 fn prompt_and_store_api_key(info: &crate::providers::registry::ProviderInfo) -> Result<()> {
     if info.id == "ollama" {
         println!("\n  Ollama next steps:");
@@ -328,9 +328,12 @@ fn prompt_and_store_api_key(info: &crate::providers::registry::ProviderInfo) -> 
         return Ok(());
     }
 
-    // Check if key already exists in keychain
-    if crate::config::keychain::has_key(&info.id) {
-        println!("\n  \x1b[32m✔\x1b[0m API key already stored in OS keychain for {}", info.id);
+    // Check if key already exists
+    if crate::config::auth::has_key(&info.id) {
+        println!(
+            "\n  \x1b[32m✔\x1b[0m API key already stored for {}",
+            info.id
+        );
         return Ok(());
     }
 
@@ -349,27 +352,21 @@ fn prompt_and_store_api_key(info: &crate::providers::registry::ProviderInfo) -> 
     println!("    Get your key: {url}");
     println!();
 
-    let key = prompt_input(
-        &format!("Paste your {} key (hidden, stored in OS keychain)", info.api_key_env),
-        None,
-    )?;
+    let key = prompt_input(&format!("Paste your {} key", info.api_key_env), None)?;
 
     let trimmed = key.trim();
     if trimmed.is_empty() {
-        println!("\n  \x1b[33m!\x1b[0m Skipped — set later via:");
-        println!("    export {}=\"your-key\"", info.api_key_env);
-        println!("    or re-run: d3vx setup");
+        println!("\n  \x1b[33m!\x1b[0m Skipped — set later via: d3vx setup");
         return Ok(());
     }
 
-    match crate::config::keychain::store_key(&info.id, trimmed) {
+    match crate::config::auth::store_key(&info.id, trimmed) {
         Ok(()) => {
-            println!("  \x1b[32m✔\x1b[0m Key stored securely in OS keychain");
-            println!("     You won't need to set {} again.", info.api_key_env);
+            println!("  \x1b[32m✔\x1b[0m Key stored in ~/.d3vx/auth.json");
         }
         Err(e) => {
-            println!("\n  \x1b[33m!\x1b[0m Keychain unavailable: {e}");
-            println!("    Set your key via: export {}=\"your-key\"", info.api_key_env);
+            println!("\n  \x1b[33m!\x1b[0m Failed to store key: {e}");
+            println!("    Re-run: d3vx setup");
         }
     }
 

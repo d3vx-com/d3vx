@@ -71,7 +71,9 @@ fn extract_key_context(messages: &[Message]) -> Vec<String> {
                 || word.ends_with(".toml")
                 || word.ends_with(".yml")
             {
-                let cleaned = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != '.' && c != '_' && c != '-');
+                let cleaned = word.trim_matches(|c: char| {
+                    !c.is_alphanumeric() && c != '/' && c != '.' && c != '_' && c != '-'
+                });
                 if !cleaned.is_empty() && !keys.contains(&cleaned.to_string()) {
                     keys.push(cleaned.to_string());
                 }

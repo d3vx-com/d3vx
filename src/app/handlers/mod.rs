@@ -187,10 +187,8 @@ impl App {
                         // next row's Y (or the end of the list).
                         let agent_positions = &self.layout.activity_agent_y_positions;
                         for (idx, &start_y) in agent_positions.iter().enumerate() {
-                            let next_y = agent_positions
-                                .get(idx + 1)
-                                .copied()
-                                .unwrap_or(usize::MAX);
+                            let next_y =
+                                agent_positions.get(idx + 1).copied().unwrap_or(usize::MAX);
                             if adjusted_y >= start_y && adjusted_y < next_y {
                                 if idx == 0 {
                                     self.agents.selected_inline_agent = Some(usize::MAX);
@@ -205,10 +203,7 @@ impl App {
                         let mut found_diff = false;
                         let diff_positions = &self.layout.activity_diff_y_positions;
                         for (idx, &start_y) in diff_positions.iter().enumerate() {
-                            let next_y = diff_positions
-                                .get(idx + 1)
-                                .copied()
-                                .unwrap_or(usize::MAX);
+                            let next_y = diff_positions.get(idx + 1).copied().unwrap_or(usize::MAX);
                             if adjusted_y >= start_y
                                 && adjusted_y < next_y
                                 && idx < self.git_changes.len()

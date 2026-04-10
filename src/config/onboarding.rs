@@ -3,10 +3,8 @@
 //! Provides first-run detection, setup wizards, and helpful error messages
 //! to guide users through initial configuration.
 
-use crate::config::defaults::get_global_config_path;
-use crate::config::keychain;
+use crate::config::auth;
 use crate::providers::SUPPORTED_PROVIDERS;
-use std::env;
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -26,28 +24,24 @@ pub fn supported_providers() -> Vec<(&'static str, &'static str, &'static str)> 
 }
 
 pub fn check_onboarding_status() -> OnboardingStatus {
-    let config_path = get_global_config_path();
+    let config_path = crate::config::defaults::get_global_config_path();
     let has_config = Path::new(&config_path).exists();
 
-    let provider = env::var("D3VX_PROVIDER")
+    let provider = std::env::var("D3VX_PROVIDER")
         .ok()
         .unwrap_or_else(|| "anthropic".to_string());
 
     let provider_info = SUPPORTED_PROVIDERS.get(&provider);
     let provider_api_key_env = provider_info.map(|p| p.api_key_env).unwrap_or("");
 
-    // Check env var first, then fall back to OS keychain
+    // Check stored credential in auth.json
     let has_api_key = if provider_api_key_env.is_empty() {
         true // Provider doesn't need a key (e.g. Ollama)
     } else {
-        env::var(provider_api_key_env)
-            .map(|v| !v.is_empty())
-            .unwrap_or(false)
-            || keychain::has_key(&provider)
+        auth::has_key(&provider)
     };
 
     let is_first_run = !has_config && !has_api_key;
-    // Broader check: config exists but API key is not set
     let needs_api_key_setup = has_config && !has_api_key;
 
     OnboardingStatus {
@@ -66,26 +60,22 @@ pub fn get_setup_instructions(provider: &str) -> String {
 To get started with d3vx, you need to set your Anthropic API key:
 
 1. Get your API key from https://console.anthropic.com/settings/keys
-2. Set the environment variable:
-   
-   export ANTHROPIC_API_KEY="sk-ant-..."
+2. Run the setup wizard:
 
-3. Run d3vx again
+   d3vx setup
 
-For permanent setup, add the export line to your shell profile (~/.zshrc, ~/.bashrc)
+3. Paste your key when prompted — it's stored securely in ~/.d3vx/auth.json
 "#
         .to_string(),
         "openai" => r#"
 To get started with d3vx, you need to set your OpenAI API key:
 
 1. Get your API key from https://platform.openai.com/api-keys
-2. Set the environment variable:
-   
-   export OPENAI_API_KEY="sk-..."
+2. Run the setup wizard:
 
-3. Run d3vx again
+   d3vx setup
 
-For permanent setup, add the export line to your shell profile (~/.zshrc, ~/.bashrc)
+3. Paste your key when prompted — it's stored securely in ~/.d3vx/auth.json
 "#
         .to_string(),
         "ollama" => r#"
@@ -94,19 +84,14 @@ Ollama is a local LLM provider. To use it:
 1. Install Ollama from https://ollama.ai
 2. Pull a model:  ollama pull qwen2.5-coder:32b
 3. Start the server: ollama serve
-4. Set environment variable (optional):
-   
-   export OLLAMA_HOST="http://localhost:11434"
-
-5. Run d3vx again
+4. Run d3vx again
 "#
         .to_string(),
         _ => format!(
             r#"
 To get started with d3vx, you need to set your {} API key.
 
-Check the provider documentation for how to obtain an API key,
-then set the appropriate environment variable.
+Run `d3vx setup` to configure your provider and store your key.
 
 Run `d3vx doctor` for environment diagnostics.
 "#,

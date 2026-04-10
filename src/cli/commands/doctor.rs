@@ -49,12 +49,12 @@ fn check_config() -> (String, Option<String>) {
 }
 
 fn check_api_key(missing_env: Option<&str>, provider: &str) -> String {
-    // Even if env var is missing, the key might be in the OS keychain
-    if missing_env.is_some() && crate::config::keychain::has_key(provider) {
-        return doctor_status("API Key", "OK", "stored in OS keychain");
+    // Key might be stored in auth.json even if env var is missing
+    if missing_env.is_some() && crate::config::auth::has_key(provider) {
+        return doctor_status("API Key", "OK", "stored in auth.json");
     }
     match missing_env {
-        None => doctor_status("API Key", "OK", "found in environment"),
+        None => doctor_status("API Key", "OK", "found"),
         Some(var) => doctor_status(
             "API Key",
             "FAIL",
