@@ -150,17 +150,19 @@ impl App {
             f.render_widget(messages, chat_inner_area);
         }
 
-        // Render subtle vertical separator line
+        // Render activity panel with subtle background contrast (no visible separator)
         if let Some(activity_rect) = activity_area {
-            let separator_x = main_area.x + main_area.width;
-            let separator_style = Style::default().fg(Color::Rgb(40, 40, 50));
-            for y in 0..size.height.saturating_sub(1) {
+            // Paint a 1-col gutter with a slightly lighter background to create
+            // visual separation via contrast edge instead of a character border.
+            let gutter_x = main_area.x + main_area.width;
+            let gutter_style = Style::default().bg(Color::Rgb(22, 22, 28));
+            for y in 0..size.height {
                 #[allow(deprecated)]
                 {
                     f.buffer_mut()
-                        .get_mut(separator_x, y)
-                        .set_char('│')
-                        .set_style(separator_style);
+                        .get_mut(gutter_x, y)
+                        .set_char(' ')
+                        .set_style(gutter_style);
                 }
             }
 
