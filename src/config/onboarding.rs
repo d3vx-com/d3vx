@@ -4,6 +4,7 @@
 //! to guide users through initial configuration.
 
 use crate::config::defaults::get_global_config_path;
+use crate::config::keychain;
 use crate::providers::SUPPORTED_PROVIDERS;
 use std::env;
 use std::path::Path;
@@ -35,12 +36,14 @@ pub fn check_onboarding_status() -> OnboardingStatus {
     let provider_info = SUPPORTED_PROVIDERS.get(&provider);
     let provider_api_key_env = provider_info.map(|p| p.api_key_env).unwrap_or("");
 
+    // Check env var first, then fall back to OS keychain
     let has_api_key = if provider_api_key_env.is_empty() {
-        true
+        true // Provider doesn't need a key (e.g. Ollama)
     } else {
         env::var(provider_api_key_env)
             .map(|v| !v.is_empty())
             .unwrap_or(false)
+            || keychain::has_key(&provider)
     };
 
     let is_first_run = !has_config && !has_api_key;

@@ -95,7 +95,7 @@ tree-sitter-python = "0.21"
 dirs = "5.0"
 
 # OS keychain for secure API key storage
-keyring = "3"
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native-sync-persistent"] }
 
 # Lazy static initialization
 once_cell = "1.20"
