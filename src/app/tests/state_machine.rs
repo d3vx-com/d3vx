@@ -488,19 +488,19 @@ mod tests {
     // ========================================================================
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-    async fn test_ctrl_o_toggles_activity_tools_expanded() {
+    async fn test_ctrl_o_toggles_chat_tools_expanded() {
         let mut app = test_app().await;
-        assert!(!app.tools.activity_tools_expanded);
+        assert!(!app.tools.chat_tools_expanded);
 
         app.handle_key_event(key_mod(KeyCode::Char('o'), KeyModifiers::CONTROL))
             .await
             .unwrap();
-        assert!(app.tools.activity_tools_expanded);
+        assert!(app.tools.chat_tools_expanded);
 
         app.handle_key_event(key_mod(KeyCode::Char('o'), KeyModifiers::CONTROL))
             .await
             .unwrap();
-        assert!(!app.tools.activity_tools_expanded);
+        assert!(!app.tools.chat_tools_expanded);
     }
 
     // ========================================================================

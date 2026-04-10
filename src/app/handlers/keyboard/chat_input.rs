@@ -56,7 +56,7 @@ impl App {
             // Toggle tools expand in activity panel (Ctrl+O)
             // Also toggles tool expansion for selected inline agent
             (KeyCode::Char('o'), KeyModifiers::CONTROL) => {
-                self.tools.activity_tools_expanded = !self.tools.activity_tools_expanded;
+                self.tools.chat_tools_expanded = !self.tools.chat_tools_expanded;
 
                 // If an inline agent is selected, toggle its tool expansion too
                 if let Some(idx) = self.agents.selected_inline_agent {

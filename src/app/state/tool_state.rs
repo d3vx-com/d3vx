@@ -34,8 +34,8 @@ pub struct ToolState {
     // ════════════════════════════════════════════════════════════════════════════
     // Tool UI State
     // ════════════════════════════════════════════════════════════════════════════
-    /// Whether tools section in activity panel is expanded
-    pub activity_tools_expanded: bool,
+    /// Whether tool calls are shown expanded in chat (Ctrl+O toggles)
+    pub chat_tools_expanded: bool,
     /// Whether standalone tool execution is enabled
     pub standalone_tools_enabled: bool,
 }
@@ -48,7 +48,7 @@ impl ToolState {
             executing_tools: Vec::new(),
             recent_tools: Vec::new(),
             expanded_tool_calls: HashSet::new(),
-            activity_tools_expanded: false,
+            chat_tools_expanded: false,
             standalone_tools_enabled: false,
         }
     }
@@ -87,7 +87,7 @@ impl ToolState {
         self.executing_tools.clear();
         self.recent_tools.clear();
         self.expanded_tool_calls.clear();
-        self.activity_tools_expanded = false;
+        self.chat_tools_expanded = false;
         // Note: standalone_tools_enabled is NOT cleared as it's a config setting
     }
 }
@@ -108,7 +108,7 @@ mod tests {
         assert!(state.executing_tools.is_empty());
         assert!(state.recent_tools.is_empty());
         assert!(state.expanded_tool_calls.is_empty());
-        assert!(!state.activity_tools_expanded);
+        assert!(!state.chat_tools_expanded);
         assert!(!state.standalone_tools_enabled);
     }
 
@@ -158,14 +158,14 @@ mod tests {
         // Note: ToolExecutionState doesn't implement Default due to Instant field
         // So we just test with empty vectors
         state.expanded_tool_calls.insert("tool-1".to_string());
-        state.activity_tools_expanded = true;
+        state.chat_tools_expanded = true;
 
         state.clear();
 
         assert!(state.executing_tools.is_empty());
         assert!(state.recent_tools.is_empty());
         assert!(state.expanded_tool_calls.is_empty());
-        assert!(!state.activity_tools_expanded);
+        assert!(!state.chat_tools_expanded);
         // standalone_tools_enabled unchanged
         assert!(!state.standalone_tools_enabled);
     }

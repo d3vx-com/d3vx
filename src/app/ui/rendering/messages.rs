@@ -105,6 +105,76 @@ impl App {
         }
     }
 
+    /// Render tool calls in collapsed mode.
+    ///
+    /// If 3 or fewer tools: show all.
+    /// If more than 3: show summary line + last 3 running/pending + any errors.
+    fn render_collapsed_tools(&self, lines: &mut Vec<Line<'_>>, tools: &[ToolCall]) {
+        let running: Vec<&ToolCall> = tools
+            .iter()
+            .filter(|t| matches!(t.status, ToolStatus::Running | ToolStatus::Pending))
+            .collect();
+        let completed = tools
+            .iter()
+            .filter(|t| t.status == ToolStatus::Completed)
+            .count();
+        let errors = tools
+            .iter()
+            .filter(|t| t.status == ToolStatus::Error)
+            .count();
+        let total = tools.len();
+
+        // If 3 or fewer, just show all
+        if total <= 3 {
+            for tool in tools {
+                self.render_inline_tool(lines, tool);
+            }
+            return;
+        }
+
+        // Summary line: "◇ 8 tools called (5 done, 1 failed)"
+        let theme = &self.ui.theme;
+        let mut summary_parts = vec![format!("{} tools called", total)];
+        if completed > 0 {
+            summary_parts.push(format!("{} done", completed));
+        }
+        if errors > 0 {
+            summary_parts.push(format!("{} failed", errors));
+        }
+        let summary_text = if summary_parts.len() > 1 {
+            format!("{} ({})", summary_parts[0], summary_parts[1..].join(", "))
+        } else {
+            summary_parts[0].clone()
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("◇", Style::default().fg(theme.ui.text_dim)),
+            Span::styled(" ", Style::default()),
+            Span::styled(summary_text, Style::default().fg(theme.ui.text_dim)),
+            Span::styled(
+                " — Ctrl+O to expand",
+                Style::default()
+                    .fg(theme.ui.text_dim)
+                    .add_modifier(Modifier::ITALIC),
+            ),
+        ]));
+
+        // Show last 3 running/pending tools
+        for tool in running.iter().rev().take(3).rev() {
+            self.render_inline_tool(lines, tool);
+        }
+
+        // Always show errors (last 2)
+        let error_tools: Vec<&ToolCall> = tools
+            .iter()
+            .filter(|t| t.status == ToolStatus::Error)
+            .collect();
+        for tool in error_tools.iter().rev().take(2).rev() {
+            self.render_inline_tool(lines, tool);
+        }
+    }
+
     /// Render messages
     pub fn render_messages(&mut self, area: Rect) -> Paragraph<'_> {
         let mut lines: Vec<Line<'_>> = Vec::new();
@@ -146,9 +216,15 @@ impl App {
                 lines.push(line);
             }
 
-            // Inline tool calls (like Claude Code)
-            for tool in &msg.tool_calls {
-                self.render_inline_tool(lines.as_mut(), tool);
+            // Inline tool calls — collapsed or expanded
+            if !msg.tool_calls.is_empty() {
+                if self.tools.chat_tools_expanded {
+                    for tool in &msg.tool_calls {
+                        self.render_inline_tool(&mut lines, tool);
+                    }
+                } else {
+                    self.render_collapsed_tools(&mut lines, &msg.tool_calls);
+                }
             }
 
             lines.push(Line::raw("")); // Spacing
