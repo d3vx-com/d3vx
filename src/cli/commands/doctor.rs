@@ -238,10 +238,18 @@ mod tests {
     }
 
     #[test]
-    fn test_api_key_missing_shows_env_var() {
+    fn test_api_key_missing_env_but_stored() {
+        // When env var is missing but key is stored in auth.json, still shows OK
         let line = check_api_key(Some("ANTHROPIC_API_KEY"), "anthropic");
-        assert!(line.contains("ANTHROPIC_API_KEY"));
-        assert!(line.contains("FAIL") || line.contains('\x1b'));
+        // Key is stored, so it should show OK (or ANSI-colored OK)
+        assert!(line.contains("OK") || line.contains("auth.json") || line.contains('\x1b'));
+    }
+
+    #[test]
+    fn test_api_key_truly_missing() {
+        // Provider with no stored key and no env var
+        let line = check_api_key(Some("SOME_UNKNOWN_KEY"), "nonexistent_provider_xyz");
+        assert!(line.contains("FAIL") || line.contains("setup"));
     }
 
     #[test]

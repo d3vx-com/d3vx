@@ -85,27 +85,18 @@ impl App {
                 if self.ui.right_sidebar_visible {
                     let chunks = Layout::default()
                         .direction(Direction::Horizontal)
-                        .constraints([
-                            Constraint::Min(0),
-                            Constraint::Length(1),
-                            Constraint::Percentage(25),
-                        ])
+                        .constraints([Constraint::Min(0), Constraint::Percentage(25)])
                         .split(content_area);
-                    (chunks[0], Some(chunks[2]))
+                    (chunks[0], Some(chunks[1]))
                 } else {
                     (content_area, None)
                 }
             } else if self.ui.right_sidebar_visible {
-                // Split with a subtle separator line (1 char wide)
                 let chunks = Layout::default()
                     .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Percentage(70),
-                        Constraint::Length(1), // Subtle separator
-                        Constraint::Percentage(30),
-                    ])
+                    .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
                     .split(content_area);
-                (chunks[0], Some(chunks[2]))
+                (chunks[0], Some(chunks[1]))
             } else {
                 (content_area, None)
             };
@@ -150,19 +141,18 @@ impl App {
             f.render_widget(messages, chat_inner_area);
         }
 
-        // Render activity panel with subtle background contrast (no visible separator)
+        // Render activity panel with a subtle left-edge tint for visual separation
         if let Some(activity_rect) = activity_area {
-            // Paint a 1-col gutter with a slightly lighter background to create
-            // visual separation via contrast edge instead of a character border.
-            let gutter_x = main_area.x + main_area.width;
-            let gutter_style = Style::default().bg(Color::Rgb(22, 22, 28));
-            for y in 0..size.height {
+            // Tint the first column of the sidebar to create a contrast edge
+            let edge_x = activity_rect.x;
+            let edge_style = Style::default().bg(Color::Rgb(20, 20, 26));
+            for y in activity_rect.top()..activity_rect.bottom() {
                 #[allow(deprecated)]
                 {
                     f.buffer_mut()
-                        .get_mut(gutter_x, y)
+                        .get_mut(edge_x, y)
                         .set_char(' ')
-                        .set_style(gutter_style);
+                        .set_style(edge_style);
                 }
             }
 
