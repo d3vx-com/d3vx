@@ -24,10 +24,8 @@ fn spawn_responder(
                 "Compiled Parallel Execution Report (batch: {}):\nSpawning {n} parallel specialist agents:\n{summary}",
                 event.batch_id
             );
-            let response_tx = std::mem::replace(
-                &mut event.response_tx,
-                tokio::sync::oneshot::channel().0,
-            );
+            let response_tx =
+                std::mem::replace(&mut event.response_tx, tokio::sync::oneshot::channel().0);
             let _ = response_tx.send(report);
             let _ = event_tx.send(event);
         }
@@ -45,10 +43,8 @@ fn spawn_forwarder(
     let (forward_tx, forward_rx) = mpsc::channel(32);
     let handle = tokio::spawn(async move {
         while let Some(mut event) = rx.recv().await {
-            let response_tx = std::mem::replace(
-                &mut event.response_tx,
-                tokio::sync::oneshot::channel().0,
-            );
+            let response_tx =
+                std::mem::replace(&mut event.response_tx, tokio::sync::oneshot::channel().0);
             let _ = response_tx.send("done".to_string());
             let _ = forward_tx.send(event).await;
         }
@@ -87,8 +83,14 @@ async fn test_spawn_parallel_tool_sends_event() {
     let result = tool.execute(input, &context).await;
 
     // Tool should succeed
-    assert!(!result.is_error, "Tool should not return error: {}", result.content);
-    assert!(result.content.contains("Spawning 3 parallel specialist agents"));
+    assert!(
+        !result.is_error,
+        "Tool should not return error: {}",
+        result.content
+    );
+    assert!(result
+        .content
+        .contains("Spawning 3 parallel specialist agents"));
 
     // Event should be sent
     let event = responder.await.expect("Event should be sent");

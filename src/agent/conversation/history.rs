@@ -133,6 +133,21 @@ impl Conversation {
         self.add_message(message);
     }
 
+    /// Insert a message after the first message (i.e., after system context).
+    /// Used by compaction to place a summary where the LLM will see it early.
+    pub fn insert_after_first(&mut self, message: Message) {
+        if self.messages.len() <= 1 {
+            self.add_message(message);
+            return;
+        }
+        let tokens = estimate_message_tokens(&message);
+        self.total_tokens += tokens;
+        // VecDeque doesn't have insert-after, so drain into a Vec and rebuild
+        let mut vec: Vec<Message> = self.messages.drain(..).collect();
+        vec.insert(1, message);
+        self.messages = vec.into_iter().collect();
+    }
+
     /// Get the last message in the conversation.
     pub fn last(&self) -> Option<&Message> {
         self.messages.back()
@@ -249,18 +264,19 @@ impl Conversation {
     }
 
     /// Compact the conversation by keeping the first message and the last N messages.
-    /// Returns the number of messages removed.
-    pub fn compact(&mut self, keep_last: usize) -> usize {
+    /// Returns the removed messages so the caller can persist them before discarding.
+    pub fn compact_drain(&mut self, keep_last: usize) -> Vec<Message> {
         if self.messages.len() <= keep_last + 1 {
-            return 0;
+            return Vec::new();
         }
-
-        let initial_len = self.messages.len();
 
         let first = self.messages.pop_front();
 
+        let mut drained = Vec::new();
         while self.messages.len() > keep_last {
-            self.messages.pop_front();
+            if let Some(msg) = self.messages.pop_front() {
+                drained.push(msg);
+            }
         }
 
         if let Some(msg) = first {
@@ -273,6 +289,12 @@ impl Conversation {
             .map(|m| estimate_message_tokens(m))
             .sum();
 
-        initial_len - self.messages.len()
+        drained
+    }
+
+    /// Compact the conversation by keeping the first message and the last N messages.
+    /// Returns the number of messages removed (messages are discarded).
+    pub fn compact(&mut self, keep_last: usize) -> usize {
+        self.compact_drain(keep_last).len()
     }
 }

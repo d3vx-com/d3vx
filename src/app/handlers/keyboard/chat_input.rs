@@ -187,6 +187,9 @@ impl App {
             (KeyCode::Char('3'), KeyModifiers::CONTROL) => {
                 self.selected_right_pane_tab = RightPaneTab::Batch;
             }
+            (KeyCode::Char('4'), KeyModifiers::CONTROL) => {
+                self.selected_right_pane_tab = RightPaneTab::Trust;
+            }
 
             // Diff-file cycling in the operator pane
             (KeyCode::Left, KeyModifiers::CONTROL) => {

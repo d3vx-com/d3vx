@@ -108,6 +108,20 @@ impl App {
             Span::styled(&req.message, Style::default().fg(self.ui.theme.ui.text)),
         ]));
 
+        // Risk level — explicit tool mapping first, then fallback by action semantics
+        if let Some(ref tool_name) = req.tool_name {
+            let (risk_label, risk_color, risk_desc) =
+                tool_risk_level(tool_name, req.action.as_str(), req.resource.as_deref());
+            lines.push(Line::from(vec![
+                Span::styled("Risk: ", Style::default().fg(self.ui.theme.ui.text_muted)),
+                Span::styled(
+                    format!("{} ", risk_label),
+                    Style::default().fg(risk_color).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(risk_desc, Style::default().fg(Color::Rgb(130, 130, 140))),
+            ]));
+        }
+
         lines.push(Line::raw(""));
 
         // Diff Preview Hint (if available)
@@ -150,15 +164,74 @@ impl App {
             ),
             Span::styled("  ", Style::default()),
             Span::styled(
-                " [V] Always Trust ",
+                " [V] Auto-approve all ",
                 Style::default()
                     .bg(self.ui.theme.brand)
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD),
             ),
         ]));
+        lines.push(Line::from(vec![Span::styled(
+            "   Auto-approve will skip this prompt for the rest of the session.",
+            Style::default().fg(self.ui.theme.ui.text_dim),
+        )]));
 
         let p = Paragraph::new(lines).wrap(Wrap { trim: true });
         f.render_widget(p, area);
+    }
+}
+
+/// Determine risk level for a tool approval prompt.
+///
+/// Strategy:
+/// 1. Explicit tool name matching for known tools
+/// 2. Fallback: analyze the action string for write/execute keywords
+/// 3. Default: MEDIUM (safe assumption for unknown tools)
+fn tool_risk_level(
+    tool_name: &str,
+    action: &str,
+    _resource: Option<&str>,
+) -> (&'static str, ratatui::style::Color, &'static str) {
+    let high = ("HIGH", Color::Rgb(220, 100, 100));
+    let medium = ("MEDIUM", Color::Rgb(220, 180, 60));
+    let low = ("LOW", Color::Rgb(80, 200, 120));
+
+    match tool_name {
+        // Command execution — always high
+        "Bash" | "BashTool" => (high.0, high.1, "runs arbitrary commands"),
+        // File creation/overwrite — high
+        "Write" | "WriteTool" => (high.0, high.1, "creates or overwrites files"),
+        // File modification — medium
+        "Edit" | "EditTool" | "MultiEditTool" => (medium.0, medium.1, "modifies existing files"),
+        // Read-only tools — low
+        "Read" | "ReadTool" | "Glob" | "GlobTool" | "Grep" | "GrepTool" => {
+            (low.0, low.1, "reads files without changes")
+        }
+        // MCP/tools that may execute — check action semantics
+        _ => {
+            let action_lower = action.to_lowercase();
+            if action_lower.contains("delete")
+                || action_lower.contains("remove")
+                || action_lower.contains("execute")
+                || action_lower.contains("run command")
+            {
+                (high.0, high.1, "destructive or command action")
+            } else if action_lower.contains("write")
+                || action_lower.contains("create")
+                || action_lower.contains("modify")
+                || action_lower.contains("update")
+            {
+                (medium.0, medium.1, "modifies project state")
+            } else if action_lower.contains("read")
+                || action_lower.contains("list")
+                || action_lower.contains("search")
+                || action_lower.contains("fetch")
+            {
+                (low.0, low.1, "reads data without changes")
+            } else {
+                // Unknown — assume medium risk
+                (medium.0, medium.1, "modifies project state")
+            }
+        }
     }
 }

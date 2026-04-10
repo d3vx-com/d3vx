@@ -31,6 +31,7 @@
 
 pub mod defaults;
 pub mod flags;
+pub mod keychain;
 pub mod loader;
 pub mod onboarding;
 pub mod security;
@@ -40,6 +41,7 @@ pub mod types;
 pub use crate::providers::SUPPORTED_PROVIDERS;
 pub use defaults::{get_global_config_dir, DEFAULT_CONFIG};
 pub use flags::{init_feature_flags, is_feature_enabled, set_feature_flag};
+pub use keychain::{delete_key, get_key, has_key, store_key};
 pub use loader::{get_api_key, get_provider_config, load_config, LoadConfigOptions};
 pub use onboarding::{
     check_onboarding_status, format_provider_options, get_doctor_command_hint,

@@ -93,8 +93,7 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
     println!("\n  \x1b[1mConfiguring: {}\x1b[0m", provider_info.name);
     println!("  Config path: {}\n", get_global_config_path());
 
-    let (default_cheap, default_standard, default_premium) =
-        provider_default_models(&selected_id);
+    let (default_cheap, default_standard, default_premium) = provider_default_models(&selected_id);
 
     let standard_model = prompt_input("Standard model", Some(&default_standard))?;
     let routing_enabled = prompt_yes_no("Enable 3-tier model routing", true)?;
@@ -114,7 +113,10 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
     let base_url = prompt_base_url(provider_info.base_url)?;
 
     // Budget configuration for cost control
-    let budget_enabled = prompt_yes_no("Enable budget enforcement (prevents runaway API costs)", true)?;
+    let budget_enabled = prompt_yes_no(
+        "Enable budget enforcement (prevents runaway API costs)",
+        true,
+    )?;
     let budget_per_session = if budget_enabled {
         let input = prompt_input("Per-session budget (USD)", Some("5.00"))?;
         input.parse::<f64>().unwrap_or(5.00)
@@ -148,7 +150,7 @@ pub(crate) async fn execute_setup(provider_arg: Option<&str>) -> Result<()> {
     }
 
     write_global_config(&yaml)?;
-    print_api_key_instructions(provider_info);
+    prompt_and_store_api_key(provider_info)?;
     print_next_steps(provider_info);
 
     Ok(())
@@ -165,12 +167,26 @@ fn print_banner() {
 
 fn prompt_base_url(default_base_url: Option<&str>) -> Result<Option<String>> {
     let default = default_base_url.unwrap_or("");
-    let input = prompt_input("Custom base URL (e.g. https://openai.api-proxy.com/v1)", if default.is_empty() { None } else { Some(default) })?;
+    let input = prompt_input(
+        "Custom base URL (e.g. https://openai.api-proxy.com/v1)",
+        if default.is_empty() {
+            None
+        } else {
+            Some(default)
+        },
+    )?;
     let trimmed = input.trim();
-    Ok(if trimmed.is_empty() { None } else { Some(trimmed.to_string()) })
+    Ok(if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    })
 }
 
-fn select_provider(arg: Option<&str>, all: &[&crate::providers::registry::ProviderInfo]) -> Result<String> {
+fn select_provider(
+    arg: Option<&str>,
+    all: &[&crate::providers::registry::ProviderInfo],
+) -> Result<String> {
     use crate::providers::SUPPORTED_PROVIDERS;
 
     if let Some(p) = arg {
@@ -185,13 +201,24 @@ fn select_provider(arg: Option<&str>, all: &[&crate::providers::registry::Provid
 
     println!("  Select your LLM provider:\n");
     for (i, info) in all.iter().enumerate() {
-        let marker = if info.id == "anthropic" { " \x1b[90m(default)\x1b[0m" } else { "" };
+        let marker = if info.id == "anthropic" {
+            " \x1b[90m(default)\x1b[0m"
+        } else {
+            ""
+        };
         let key_note = if info.requires_api_key {
             format!("needs {}", info.api_key_env)
         } else {
             "no key needed".to_string()
         };
-        println!("    {}. {:<12} {:<20} {}{}", i + 1, info.id, info.name, key_note, marker);
+        println!(
+            "    {}. {:<12} {:<20} {}{}",
+            i + 1,
+            info.id,
+            info.name,
+            key_note,
+            marker
+        );
     }
     println!("    0. Exit\n");
 
@@ -287,47 +314,76 @@ fn write_global_config(yaml: &str) -> Result<()> {
     Ok(())
 }
 
-fn print_api_key_instructions(info: &crate::providers::registry::ProviderInfo) {
+/// Prompt the user for an API key and store it in the OS keychain.
+fn prompt_and_store_api_key(info: &crate::providers::registry::ProviderInfo) -> Result<()> {
     if info.id == "ollama" {
         println!("\n  Ollama next steps:");
         println!("    1. Install Ollama: https://ollama.ai");
         println!("    2. Pull a model:   ollama pull {}", info.default_model);
         println!("    3. Start server:   ollama serve");
-        return;
+        return Ok(());
     }
 
-    println!("\n  API key setup:");
+    if info.api_key_env.is_empty() {
+        return Ok(());
+    }
+
+    // Check if key already exists in keychain
+    if crate::config::keychain::has_key(&info.id) {
+        println!("\n  \x1b[32m✔\x1b[0m API key already stored in OS keychain for {}", info.id);
+        return Ok(());
+    }
 
     let url = match info.id {
-        "anthropic"  => "https://console.anthropic.com/settings/keys",
-        "openai"     => "https://platform.openai.com/api-keys",
-        "groq"       => "https://console.groq.com/keys",
+        "anthropic" => "https://console.anthropic.com/settings/keys",
+        "openai" => "https://platform.openai.com/api-keys",
+        "groq" => "https://console.groq.com/keys",
         "openrouter" => "https://openrouter.ai/keys",
-        "xai"        => "https://console.x.ai",
-        "mistral"    => "https://console.mistral.ai/api-keys",
-        "deepseek"   => "https://platform.deepseek.com/api_keys",
-        _            => "provider's dashboard",
+        "xai" => "https://console.x.ai",
+        "mistral" => "https://console.mistral.ai/api-keys",
+        "deepseek" => "https://platform.deepseek.com/api_keys",
+        _ => "provider's dashboard",
     };
 
-    println!("    1. Get your key: {url}");
-    if !info.api_key_env.is_empty() {
-        println!("    2. Add to your shell profile (~/.zshrc or ~/.bashrc):");
-        println!("         export {}=\"your-key-here\"", info.api_key_env);
-        println!("    3. Reload:  source ~/.zshrc");
+    println!("\n  API key:");
+    println!("    Get your key: {url}");
+    println!();
+
+    let key = prompt_input(
+        &format!("Paste your {} key (hidden, stored in OS keychain)", info.api_key_env),
+        None,
+    )?;
+
+    let trimmed = key.trim();
+    if trimmed.is_empty() {
+        println!("\n  \x1b[33m!\x1b[0m Skipped — set later via:");
+        println!("    export {}=\"your-key\"", info.api_key_env);
+        println!("    or re-run: d3vx setup");
+        return Ok(());
     }
+
+    match crate::config::keychain::store_key(&info.id, trimmed) {
+        Ok(()) => {
+            println!("  \x1b[32m✔\x1b[0m Key stored securely in OS keychain");
+            println!("     You won't need to set {} again.", info.api_key_env);
+        }
+        Err(e) => {
+            println!("\n  \x1b[33m!\x1b[0m Keychain unavailable: {e}");
+            println!("    Set your key via: export {}=\"your-key\"", info.api_key_env);
+        }
+    }
+
+    Ok(())
 }
 
 fn print_next_steps(info: &crate::providers::registry::ProviderInfo) {
     println!("\n  {}", "─".repeat(46));
-    println!("  \x1b[1mYou're almost ready.\x1b[0m Run these to verify:\n");
+    println!("  \x1b[1mYou're all set.\x1b[0m Run these to verify:\n");
     println!("    d3vx doctor");
     println!("    d3vx \"add input validation to the login form\" --vex\n");
 
-    if info.id != "ollama" && !info.api_key_env.is_empty() {
-        println!(
-            "  \x1b[90mTip: set {} before running d3vx doctor\x1b[0m\n",
-            info.api_key_env
-        );
+    if info.id == "ollama" {
+        println!("  \x1b[90mMake sure Ollama is running before starting.\x1b[0m\n");
     }
 }
 
@@ -352,7 +408,10 @@ fn write_project_config(d3vx_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn write_project_md(d3vx_dir: &PathBuf, detected: &crate::utils::project::DetectedProject) -> Result<()> {
+fn write_project_md(
+    d3vx_dir: &PathBuf,
+    detected: &crate::utils::project::DetectedProject,
+) -> Result<()> {
     let content = generate_project_md(detected);
     fs::write(d3vx_dir.join("project.md"), content)?;
     Ok(())

@@ -26,10 +26,8 @@ fn spawn_responder(
                 event.batch_id
             );
             // Take the response_tx out so we don't move the rest of the event
-            let response_tx = std::mem::replace(
-                &mut event.response_tx,
-                tokio::sync::oneshot::channel().0,
-            );
+            let response_tx =
+                std::mem::replace(&mut event.response_tx, tokio::sync::oneshot::channel().0);
             let _ = response_tx.send(report);
             let _ = event_tx.send(event);
         }

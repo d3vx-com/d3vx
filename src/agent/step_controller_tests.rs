@@ -68,10 +68,7 @@ fn test_default_controller() {
 
 #[test]
 fn test_with_steps_constructor() {
-    let controller = StepController::with_steps(vec![
-        StepControl::Continue,
-        StepControl::End,
-    ]);
+    let controller = StepController::with_steps(vec![StepControl::Continue, StepControl::End]);
     assert!(controller.has_next());
     assert_eq!(controller.step_count(), 0);
 }
@@ -79,10 +76,7 @@ fn test_with_steps_constructor() {
 #[test]
 fn test_add_steps_batch() {
     let mut controller = StepController::new();
-    controller.add_steps(vec![
-        StepControl::Step,
-        StepControl::Continue,
-    ]);
+    controller.add_steps(vec![StepControl::Step, StepControl::Continue]);
     assert_eq!(controller.step_count(), 0);
     assert_eq!(controller.next(), Some(StepControl::Step));
     assert_eq!(controller.next(), Some(StepControl::Continue));
@@ -90,11 +84,7 @@ fn test_add_steps_batch() {
 
 #[test]
 fn test_reset_controller() {
-    let mut controller = StepBuilder::new()
-        .step()
-        .step_all()
-        .continue_exec()
-        .build();
+    let mut controller = StepBuilder::new().step().step_all().continue_exec().build();
     controller.next();
     controller.next();
     assert_eq!(controller.step_count(), 2);
@@ -143,7 +133,11 @@ fn test_generate_n_with_prompt_builder() {
         .build();
 
     match controller.next() {
-        Some(StepControl::GenerateN { n, prompt, selector_prompt }) => {
+        Some(StepControl::GenerateN {
+            n,
+            prompt,
+            selector_prompt,
+        }) => {
             assert_eq!(n, 3);
             assert_eq!(prompt, Some("pick the best".to_string()));
             assert_eq!(selector_prompt, Some("choose: ".to_string()));

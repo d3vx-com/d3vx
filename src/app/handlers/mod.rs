@@ -87,6 +87,7 @@ impl App {
                 self.add_system_message(&format!("Error: {}", msg));
             }
         }
+        self.needs_redraw = true;
         Ok(())
     }
 
@@ -175,17 +176,22 @@ impl App {
                         && y >= activity_rect.y
                         && y < activity_rect.y + activity_rect.height
                     {
-                        // Calculate click position relative to content area (summary_area already has padding built in)
+                        // Calculate click position relative to content area
                         let content_y = (y - activity_rect.y) as usize;
                         // Adjust for scroll offset
                         let adjusted_y = content_y + self.ui.activity_scroll_offset;
 
-                        // Match against activity_agent_y_positions
-                        // Index 0 in activity_agent_y_positions is now "Main Session" (usize::MAX)
-                        for (idx, &agent_y) in
-                            self.layout.activity_agent_y_positions.iter().enumerate()
-                        {
-                            if adjusted_y == agent_y {
+                        // Range-based agent row matching:
+                        // Each stored Y marks the *start* of that row. A click hits
+                        // a row if it's on or after that row's Y, but before the
+                        // next row's Y (or the end of the list).
+                        let agent_positions = &self.layout.activity_agent_y_positions;
+                        for (idx, &start_y) in agent_positions.iter().enumerate() {
+                            let next_y = agent_positions
+                                .get(idx + 1)
+                                .copied()
+                                .unwrap_or(usize::MAX);
+                            if adjusted_y >= start_y && adjusted_y < next_y {
                                 if idx == 0 {
                                     self.agents.selected_inline_agent = Some(usize::MAX);
                                 } else if idx - 1 < self.agents.inline_agents.len() {
@@ -197,10 +203,16 @@ impl App {
                         }
 
                         let mut found_diff = false;
-                        for (idx, &diff_y) in
-                            self.layout.activity_diff_y_positions.iter().enumerate()
-                        {
-                            if adjusted_y == diff_y && idx < self.git_changes.len() {
+                        let diff_positions = &self.layout.activity_diff_y_positions;
+                        for (idx, &start_y) in diff_positions.iter().enumerate() {
+                            let next_y = diff_positions
+                                .get(idx + 1)
+                                .copied()
+                                .unwrap_or(usize::MAX);
+                            if adjusted_y >= start_y
+                                && adjusted_y < next_y
+                                && idx < self.git_changes.len()
+                            {
                                 self.select_git_change(idx);
                                 found_diff = true;
                                 break;
@@ -221,20 +233,28 @@ impl App {
                         && y >= tab_rect.y
                         && y < tab_rect.y + tab_rect.height
                     {
-                        // Calculate position relative to tab bar (tabs start after "Tabs ")
                         let rel_x = (x - tab_rect.x) as usize;
-                        // Each tab is roughly " N Name " format
-                        // "Tabs " = 5 chars, then tabs at ~8 chars each
-                        if rel_x >= 5 {
-                            let tab_index = (rel_x - 5) / 8;
-                            match tab_index {
-                                0 => self.selected_right_pane_tab = RightPaneTab::Agent,
-                                1 => self.selected_right_pane_tab = RightPaneTab::Diff,
-                                2 => self.selected_right_pane_tab = RightPaneTab::Batch,
-                                _ => {}
+                        // Actual rendered tab widths: " N:Label " with "│" between tabs
+                        let tab_labels = ["1:Agent", "2:Diff", "3:Batch", "4:Readiness"];
+                        let tab_tabs = [
+                            RightPaneTab::Agent,
+                            RightPaneTab::Diff,
+                            RightPaneTab::Batch,
+                            RightPaneTab::Trust,
+                        ];
+                        let mut offset = 0usize;
+                        for (i, label) in tab_labels.iter().enumerate() {
+                            let tab_width = label.len() + 2; // " " + label + " "
+                            if rel_x >= offset && rel_x < offset + tab_width {
+                                self.selected_right_pane_tab = tab_tabs[i];
+                                self.ui.selected_agent_output_scroll = 0;
+                                return Ok(());
                             }
-                            self.ui.selected_agent_output_scroll = 0;
-                            return Ok(());
+                            offset += tab_width;
+                            // Skip separator "│" between tabs
+                            if i < tab_labels.len() - 1 {
+                                offset += 1;
+                            }
                         }
                     }
                 }

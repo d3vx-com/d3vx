@@ -8,6 +8,7 @@ use ratatui::Frame;
 
 use crate::app::state::InlineAgentStatus;
 use crate::app::App;
+use crate::app::InlineAgentInfo;
 use crate::ui::symbols::AI_INDICATOR;
 
 use crate::app::ui::helpers::{braille_frame, MUTED_WHITE};
@@ -54,13 +55,29 @@ impl App {
         // Header: Braille Spinner + Task Title
         let (status_icon, status_color) = agent_status_style(agent.status, self);
 
+        // Header: Braille Spinner + Task Title (prefix "Background:" for vex agents)
+        let is_background = agent.id.starts_with("vex:");
+        let task_label = if is_background {
+            format!("Background: {}", agent.task)
+        } else {
+            agent.task.clone()
+        };
+
+        // Truncate header to fit the detail panel width (leave room for icon + padding)
+        let max_header = inner.width.saturating_sub(6) as usize;
+        let display_label = if task_label.len() > max_header {
+            format!("{}..", &task_label[..max_header.saturating_sub(2)])
+        } else {
+            task_label
+        };
+
         detail_lines.push(Line::from(vec![
             Span::styled(
                 format!("{} ", status_icon),
                 Style::default().fg(status_color),
             ),
             Span::styled(
-                agent.task.clone(),
+                display_label,
                 Style::default()
                     .fg(self.ui.theme.brand)
                     .add_modifier(Modifier::BOLD),
@@ -126,6 +143,14 @@ impl App {
                 ]));
             }
         }
+        // Failure context for failed/cancelled agents
+        if matches!(
+            agent.status,
+            InlineAgentStatus::Failed | InlineAgentStatus::Cancelled
+        ) {
+            self.render_failure_context(&mut detail_lines, agent);
+        }
+
         detail_lines.push(Line::raw(""));
 
         // Clean Text Transcript (No tool noise)
@@ -183,6 +208,63 @@ impl App {
             .wrap(Wrap { trim: true })
             .scroll((self.ui.selected_agent_output_scroll as u16, 0));
         f.render_widget(paragraph, inner);
+    }
+
+    /// Render failure context: what went wrong (honest — no fake keyboard shortcuts)
+    fn render_failure_context(&self, lines: &mut Vec<Line<'_>>, agent: &InlineAgentInfo) {
+        let is_cancelled = agent.status == InlineAgentStatus::Cancelled;
+
+        // Header line explaining what happened
+        let (header_text, header_color) = if is_cancelled {
+            ("Task was cancelled", Color::Rgb(150, 150, 160))
+        } else {
+            ("Something went wrong", Color::Rgb(220, 100, 100))
+        };
+
+        lines.push(Line::from(vec![Span::styled(
+            header_text,
+            Style::default()
+                .fg(header_color)
+                .add_modifier(Modifier::BOLD),
+        )]));
+
+        // Show last error or tool output
+        let last_error = agent.messages.iter().rev().find(|m| {
+            matches!(m.line_type, crate::app::state::AgentLineType::ToolOutput)
+                && (m.content.contains("ERROR")
+                    || m.content.contains("failed")
+                    || m.content.contains("error"))
+        });
+
+        if let Some(err) = last_error {
+            let err_content = err.content.clone();
+            lines.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(err_content, Style::default().fg(Color::Rgb(200, 140, 140))),
+            ]));
+        }
+
+        // Show what was attempted
+        if agent.tool_count > 0 {
+            lines.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(
+                    format!(
+                        "Completed {} tool call(s) before stopping",
+                        agent.tool_count
+                    ),
+                    Style::default().fg(Color::Rgb(130, 130, 140)),
+                ),
+            ]));
+        }
+
+        // Honest guidance — no fake keyboard shortcuts
+        if !is_cancelled {
+            lines.push(Line::from(vec![Span::styled(
+                "  Scroll up to review the transcript, or start a new task.",
+                Style::default().fg(Color::Rgb(130, 130, 140)),
+            )]));
+        }
     }
 }
 

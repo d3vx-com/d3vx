@@ -79,7 +79,10 @@ mod tests {
         let d3vx_dir = path.join(".d3vx");
         fs::create_dir_all(&d3vx_dir)?;
         fs::create_dir_all(d3vx_dir.join("memory"))?;
-        fs::write(d3vx_dir.join("config.yml"), "version: 1\nprovider: anthropic\nmodel: claude-sonnet-4-20250514\n")?;
+        fs::write(
+            d3vx_dir.join("config.yml"),
+            "version: 1\nprovider: anthropic\nmodel: claude-sonnet-4-20250514\n",
+        )?;
         fs::write(d3vx_dir.join("project.md"), "# Project\n")?;
 
         assert!(d3vx_dir.exists());

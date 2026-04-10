@@ -1,8 +1,7 @@
 //! Tests for provider core types (TokenUsage, Message, ContentBlock, Role, etc.)
 
 use crate::providers::{
-    ComplexityTier, Message, MessagesRequest, ReasoningEffort,
-    Role, ThinkingConfig,
+    ComplexityTier, Message, MessagesRequest, ReasoningEffort, Role, ThinkingConfig,
 };
 
 // ── Role Tests ────────────────────────────────────────────────

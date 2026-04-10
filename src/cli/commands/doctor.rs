@@ -8,7 +8,9 @@
 use anyhow::Result;
 
 use crate::cli::commands::daemon::{process_running, read_daemon_pid};
-use crate::cli::commands::helpers::{command_version, doctor_status, free_disk_mb, DoctorRuntimeContext};
+use crate::cli::commands::helpers::{
+    command_version, doctor_status, free_disk_mb, DoctorRuntimeContext,
+};
 use crate::config::{get_provider_config, load_config, LoadConfigOptions};
 use crate::providers::SUPPORTED_PROVIDERS;
 
@@ -46,13 +48,17 @@ fn check_config() -> (String, Option<String>) {
     }
 }
 
-fn check_api_key(missing_env: Option<&str>) -> String {
+fn check_api_key(missing_env: Option<&str>, provider: &str) -> String {
+    // Even if env var is missing, the key might be in the OS keychain
+    if missing_env.is_some() && crate::config::keychain::has_key(provider) {
+        return doctor_status("API Key", "OK", "stored in OS keychain");
+    }
     match missing_env {
         None => doctor_status("API Key", "OK", "found in environment"),
         Some(var) => doctor_status(
             "API Key",
             "FAIL",
-            format!("{var} not set  →  export {var}=\"your-key-here\""),
+            format!("{var} not set  →  run: d3vx setup"),
         ),
     }
 }
@@ -102,9 +108,7 @@ fn check_worktree_support(cwd: &str) -> String {
 
 fn check_disk(cwd: &str) -> String {
     match free_disk_mb(cwd) {
-        Some(mb) if mb >= MIN_DISK_MB => {
-            doctor_status("Disk Space", "OK", format!("{mb} MB free"))
-        }
+        Some(mb) if mb >= MIN_DISK_MB => doctor_status("Disk Space", "OK", format!("{mb} MB free")),
         Some(mb) => doctor_status(
             "Disk Space",
             "WARN",
@@ -138,7 +142,11 @@ fn check_daemon() -> String {
             "WARN",
             format!("stale pid file (pid {pid}) — run: d3vx daemon start"),
         ),
-        None => doctor_status("Daemon", "INFO", "not running (optional for background tasks)"),
+        None => doctor_status(
+            "Daemon",
+            "INFO",
+            "not running (optional for background tasks)",
+        ),
     }
 }
 
@@ -163,8 +171,11 @@ pub(crate) fn build_doctor_report(context: DoctorRuntimeContext) -> Result<Strin
 
     // Config + API key (linked: config tells us which env var to look for)
     let (config_line, missing_env) = check_config();
+    let provider = load_config(LoadConfigOptions::default())
+        .map(|c| c.provider.clone())
+        .unwrap_or_else(|_| "anthropic".to_string());
     out.push_str(&config_line);
-    out.push_str(&check_api_key(missing_env.as_deref()));
+    out.push_str(&check_api_key(missing_env.as_deref(), &provider));
 
     // Git
     out.push_str(&check_git());
@@ -183,14 +194,22 @@ pub(crate) fn build_doctor_report(context: DoctorRuntimeContext) -> Result<Strin
         out.push_str(&doctor_status(
             "TUI DB",
             if connected { "OK" } else { "WARN" },
-            if connected { "connected" } else { "not connected" },
+            if connected {
+                "connected"
+            } else {
+                "not connected"
+            },
         ));
     }
     if let Some(initialized) = context.provider_initialized {
         out.push_str(&doctor_status(
             "TUI Provider",
             if initialized { "OK" } else { "WARN" },
-            if initialized { "initialized" } else { "not initialized" },
+            if initialized {
+                "initialized"
+            } else {
+                "not initialized"
+            },
         ));
     }
 
@@ -220,14 +239,14 @@ mod tests {
 
     #[test]
     fn test_api_key_missing_shows_env_var() {
-        let line = check_api_key(Some("ANTHROPIC_API_KEY"));
+        let line = check_api_key(Some("ANTHROPIC_API_KEY"), "anthropic");
         assert!(line.contains("ANTHROPIC_API_KEY"));
         assert!(line.contains("FAIL") || line.contains('\x1b'));
     }
 
     #[test]
     fn test_api_key_present_shows_ok() {
-        let line = check_api_key(None);
+        let line = check_api_key(None, "anthropic");
         assert!(line.contains("OK") || line.contains('\x1b'));
     }
 

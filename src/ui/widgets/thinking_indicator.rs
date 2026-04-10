@@ -38,8 +38,36 @@ const TIPS: &[&str] = &[
     "Tip: Esc twice opens undo picker",
 ];
 
-/// Phase names for breadcrumbs
-const PHASES: &[&str] = &["Research", "Plan", "Draft", "Implement", "Review", "Docs"];
+/// Phase names for breadcrumbs (internal → user-facing mapping)
+const PHASE_DISPLAY_NAMES: &[(&str, &str)] = &[
+    ("Research", "Understanding"),
+    ("Ideation", "Exploring"),
+    ("Plan", "Planning"),
+    ("Draft", "Writing code"),
+    ("Implement", "Implementing"),
+    ("Review", "Checking"),
+    ("Docs", "Documenting"),
+    ("Validate", "Validating"),
+];
+
+/// Get user-facing name for a pipeline phase
+fn user_facing_phase(internal: &str) -> &str {
+    PHASE_DISPLAY_NAMES
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case(internal))
+        .map(|(_, display)| *display)
+        .unwrap_or(internal)
+}
+
+/// Ordered phase list for breadcrumbs (using user-facing names)
+const PHASES: &[&str] = &[
+    "Understanding",
+    "Planning",
+    "Writing code",
+    "Implementing",
+    "Checking",
+    "Documenting",
+];
 
 /// Thinking indicator configuration (owned)
 pub struct ThinkingIndicator {
@@ -212,7 +240,7 @@ impl ThinkingIndicator {
         let brand_color = self.theme.brand;
 
         // Detect Vex Mode
-        let is_vex_mode = self.text.as_deref() == Some("Vex Mode Active");
+        let is_vex_mode = self.text.as_deref() == Some("Background Task Active");
 
         // Mascot prefix for Vex Mode
         if is_vex_mode {
@@ -278,13 +306,13 @@ impl ThinkingIndicator {
 
         lines.push(Line::from(spans));
 
-        // Phase breadcrumbs
+        // Phase breadcrumbs (user-facing names)
         if let Some(current_phase) = &self.phase {
             let mut phase_spans = vec![Span::raw("  ")];
-            let phase_upper = current_phase.to_uppercase();
+            let display_name = user_facing_phase(current_phase);
 
             for (i, phase) in PHASES.iter().enumerate() {
-                let is_current = phase.to_uppercase() == phase_upper;
+                let is_current = phase == &display_name;
                 let color = if is_current {
                     brand_color
                 } else {

@@ -49,12 +49,12 @@ impl KanbanColumn {
     /// Define the standard Kanban columns based on the blueprint
     pub const STANDARD_COLUMNS: &'static [Self] = &[
         Self {
-            name: "Inbox",
+            name: "To Do",
             states: &[TaskState::Backlog, TaskState::Queued],
             color: Color::Gray,
         },
         Self {
-            name: "Running",
+            name: "In Progress",
             states: &[
                 TaskState::Research,
                 TaskState::Plan,
@@ -78,6 +78,11 @@ impl KanbanColumn {
             color: Color::Blue,
         },
         Self {
+            name: "Needs Attention",
+            states: &[TaskState::Failed],
+            color: Color::Rgb(220, 160, 50), // Amber
+        },
+        Self {
             name: "Review",
             states: &[TaskState::Review, TaskState::Docs, TaskState::Learn],
             color: Color::Yellow,
@@ -86,11 +91,6 @@ impl KanbanColumn {
             name: "Done",
             states: &[TaskState::Done],
             color: Color::Green,
-        },
-        Self {
-            name: "Failed",
-            states: &[TaskState::Failed],
-            color: Color::Red,
         },
     ];
 
@@ -243,7 +243,7 @@ impl Board {
             let graph = Paragraph::new(lines)
                 .block(
                     Block::default()
-                        .title(" Multi-Agent Graph ")
+                        .title(" Parallel Agents ")
                         .borders(Borders::ALL)
                         .border_style(Style::default().fg(Color::Cyan)),
                 )
@@ -301,9 +301,9 @@ impl Board {
 
                 // Build task line with execution mode badge
                 let mode_badge = match &task.execution_mode {
-                    Some(ExecutionMode::Vex) => " [V]",
-                    Some(ExecutionMode::Direct) => " [D]",
-                    Some(ExecutionMode::Auto) => "", // Auto is implicit, no badge
+                    Some(ExecutionMode::Vex) => " ⏎",  // Background task
+                    Some(ExecutionMode::Direct) => "", // Interactive is the default
+                    Some(ExecutionMode::Auto) => "",
                     None => "",
                 };
 
@@ -397,19 +397,22 @@ mod tests {
     fn test_column_state_mapping() {
         let columns = KanbanColumn::STANDARD_COLUMNS;
 
-        // Backlog should be in Inbox
+        // Backlog should be in To Do
         assert!(columns[0].contains_state(&TaskState::Backlog));
         assert!(columns[0].contains_state(&TaskState::Queued));
 
-        // Research should be in Running
+        // Research should be in In Progress
         assert!(columns[1].contains_state(&TaskState::Research));
         assert!(columns[1].contains_state(&TaskState::Implement));
 
-        // Done should be in Done
-        assert!(columns[3].contains_state(&TaskState::Done));
+        // Failed should be in Needs Attention
+        assert!(columns[2].contains_state(&TaskState::Failed));
 
-        // Failed should be in Failed
-        assert!(columns[4].contains_state(&TaskState::Failed));
+        // Review should be in Review
+        assert!(columns[3].contains_state(&TaskState::Review));
+
+        // Done should be in Done
+        assert!(columns[4].contains_state(&TaskState::Done));
     }
 
     #[test]

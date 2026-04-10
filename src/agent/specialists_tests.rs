@@ -27,9 +27,18 @@ fn test_agent_type_display_variants() {
 #[test]
 fn test_agent_type_specialist_role_labels() {
     assert_eq!(AgentType::General.specialist_role_label(), "Executor");
-    assert_eq!(AgentType::Backend.specialist_role_label(), "Backend Specialist");
-    assert_eq!(AgentType::Testing.specialist_role_label(), "Test Specialist");
-    assert_eq!(AgentType::Security.specialist_role_label(), "Security Reviewer");
+    assert_eq!(
+        AgentType::Backend.specialist_role_label(),
+        "Backend Specialist"
+    );
+    assert_eq!(
+        AgentType::Testing.specialist_role_label(),
+        "Test Specialist"
+    );
+    assert_eq!(
+        AgentType::Security.specialist_role_label(),
+        "Security Reviewer"
+    );
     assert_eq!(AgentType::Review.specialist_role_label(), "Code Reviewer");
 }
 

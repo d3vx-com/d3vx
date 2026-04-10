@@ -1,6 +1,8 @@
 //! Issue Sync Tests
 
-use crate::pipeline::issue_sync::{ExternalIssue, IssueState, IssueTracker, SyncError, SyncResult, TrackerKind};
+use crate::pipeline::issue_sync::{
+    ExternalIssue, IssueState, IssueTracker, SyncError, SyncResult, TrackerKind,
+};
 
 #[test]
 fn test_external_issue_fields() {

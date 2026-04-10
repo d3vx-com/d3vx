@@ -536,7 +536,10 @@ mod tests {
 
         // Check that permission request was created in the manager
         let perm_req = guard.get_permission_request("perm-test-1").await;
-        assert!(perm_req.is_some_and(|req| req.state == PermissionState::Pending), "Permission request should be created and in Pending state");
+        assert!(
+            perm_req.is_some_and(|req| req.state == PermissionState::Pending),
+            "Permission request should be created and in Pending state"
+        );
         let perm_req = guard.get_permission_request("perm-test-1").await.unwrap();
         assert_eq!(perm_req.tool_name, "WriteTool");
         assert_eq!(perm_req.session_id, session_id);

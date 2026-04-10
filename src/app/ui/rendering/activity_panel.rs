@@ -69,32 +69,76 @@ impl App {
             current_line += 1;
 
             for tool in &self.tools.executing_tools {
+                let input_hint = tool_input_hint(&tool.name, &tool.input);
+                let elapsed = format_elapsed(tool.start_time);
                 summary_lines.push(Line::from(vec![
                     Span::styled(" > ", Style::default().fg(Color::Rgb(100, 200, 255))),
                     Span::styled(
                         tool.name.clone(),
                         Style::default().fg(self.ui.theme.ui.text),
                     ),
+                    if !input_hint.is_empty() {
+                        Span::styled(
+                            format!(" {}", input_hint),
+                            Style::default()
+                                .fg(self.ui.theme.ui.text_dim)
+                                .add_modifier(Modifier::DIM),
+                        )
+                    } else {
+                        Span::raw("")
+                    },
+                    Span::styled(
+                        format!(" {}", elapsed),
+                        Style::default()
+                            .fg(self.ui.theme.ui.text_dim)
+                            .add_modifier(Modifier::DIM),
+                    ),
                 ]));
                 current_line += 1;
             }
 
             for tool in self.tools.recent_tools.iter().rev().take(5) {
-                let color = if tool.is_error {
-                    Color::Rgb(255, 100, 100)
+                let (icon, color) = if tool.is_error {
+                    ("x", Color::Rgb(255, 100, 100))
                 } else {
-                    Color::Rgb(100, 255, 150)
+                    ("+", Color::Rgb(100, 255, 150))
                 };
-                summary_lines.push(Line::from(vec![
-                    Span::styled(
-                        format!(" {} ", if tool.is_error { "x" } else { "+" }),
-                        Style::default().fg(color),
-                    ),
+                let input_hint = tool_input_hint(&tool.name, &tool.input);
+                let mut spans = vec![
+                    Span::styled(format!(" {} ", icon), Style::default().fg(color)),
                     Span::styled(
                         tool.name.clone(),
                         Style::default().fg(self.ui.theme.ui.text_dim),
                     ),
-                ]));
+                ];
+                if !input_hint.is_empty() {
+                    spans.push(Span::styled(
+                        format!(" {}", input_hint),
+                        Style::default()
+                            .fg(self.ui.theme.ui.text_dim)
+                            .add_modifier(Modifier::DIM),
+                    ));
+                }
+                // Show first line of error output for failed tools
+                if tool.is_error {
+                    if let Some(err) = &tool.output {
+                        let first_line = err.lines().next().unwrap_or("").trim();
+                        if !first_line.is_empty() {
+                            let truncated = if first_line.len() > 60 {
+                                format!("{}...", &first_line[..57])
+                            } else {
+                                first_line.to_string()
+                            };
+                            spans.push(Span::styled(
+                                format!(" — {}", truncated),
+                                Style::default()
+                                    .fg(Color::Rgb(200, 140, 140))
+                                    .add_modifier(Modifier::DIM),
+                            ));
+                        }
+                    }
+                }
+                summary_lines.push(Line::from(spans));
                 current_line += 1;
             }
 
@@ -233,6 +277,14 @@ impl App {
             return current_line;
         }
 
+        // Use the summary area width for truncation — fall back to 40 if unknown
+        let max_task_chars = self
+            .layout
+            .last_activity_rect
+            .map(|r| r.width.saturating_sub(14) as usize) // "- > icon ... [Xm Ys]" overhead
+            .unwrap_or(28)
+            .max(12);
+
         summary_lines.push(Line::from(vec![Span::styled(
             format!("Agents ({})", self.agents.inline_agents.len()),
             Style::default()
@@ -252,6 +304,8 @@ impl App {
                 Style::default().fg(self.ui.theme.ui.text)
             };
 
+            let short_task = truncate_to_words(&agent.task, max_task_chars);
+
             self.layout.activity_agent_y_positions.push(current_line);
             summary_lines.push(Line::from(vec![
                 Span::styled(
@@ -259,7 +313,7 @@ impl App {
                     Style::default().fg(self.ui.theme.brand),
                 ),
                 Span::styled(icon, Style::default().fg(color)),
-                Span::styled(agent.task.clone(), task_style),
+                Span::styled(short_task, task_style),
                 Span::styled(
                     format!(" [{}]", agent.elapsed()),
                     Style::default().fg(self.ui.theme.ui.text_dim),
@@ -268,5 +322,113 @@ impl App {
             current_line += 1;
         }
         current_line
+    }
+}
+
+/// Generate a short input hint for a tool call (e.g., file path, command)
+fn tool_input_hint(name: &str, input: &serde_json::Value) -> String {
+    let get_str = |key: &str| -> String {
+        input
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
+    };
+    let truncate = |s: &str| -> String {
+        if s.len() > 40 {
+            format!("{}...", &s[..37])
+        } else {
+            s.to_string()
+        }
+    };
+    match name {
+        "Bash" | "BashTool" => truncate(&get_str("command")),
+        "Read" | "ReadTool" => truncate(&get_str("file_path")),
+        "Write" | "WriteTool" => truncate(&get_str("file_path")),
+        "Edit" | "EditTool" | "MultiEditTool" => truncate(&get_str("file_path")),
+        "Grep" | "GrepTool" => {
+            let pattern = get_str("pattern");
+            if pattern.is_empty() {
+                String::new()
+            } else {
+                format!("\"{}\"", truncate(&pattern))
+            }
+        }
+        "Glob" | "GlobTool" => truncate(&get_str("pattern")),
+        _ => String::new(),
+    }
+}
+
+/// Format elapsed time since an Instant
+fn format_elapsed(start: std::time::Instant) -> String {
+    let elapsed = start.elapsed();
+    let secs = elapsed.as_secs();
+    if secs < 60 {
+        format!("{}s", secs)
+    } else {
+        format!("{}m{}s", secs / 60, secs % 60)
+    }
+}
+
+/// Truncate a task description to 2-3 words that fit within `max_chars`.
+///
+/// Strategy: take whole words until we'd exceed the budget, then append "..".
+/// Falls back to hard-char truncation if the first word itself is too long.
+fn truncate_to_words(task: &str, max_chars: usize) -> String {
+    if task.len() <= max_chars {
+        return task.to_string();
+    }
+
+    let mut used = 0;
+    let mut words: Vec<&str> = Vec::new();
+    for word in task.split_whitespace() {
+        // +1 for the space between words (except before the first)
+        let needed = word.len() + if words.is_empty() { 0 } else { 1 };
+        if used + needed > max_chars.saturating_sub(2) {
+            // Reserve 2 chars for ".."
+            break;
+        }
+        words.push(word);
+        used += needed;
+    }
+
+    if words.is_empty() {
+        // First word is too long — hard-truncate it
+        format!("{}..", &task[..max_chars.saturating_sub(2).max(1)])
+    } else {
+        format!("{}..", words.join(" "))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate_to_words_short_enough() {
+        assert_eq!(truncate_to_words("Fix bug", 20), "Fix bug");
+    }
+
+    #[test]
+    fn test_truncate_to_words_truncates() {
+        assert_eq!(
+            truncate_to_words("Fix the authentication bug in the login module", 18),
+            "Fix the.."
+        );
+    }
+
+    #[test]
+    fn test_truncate_to_words_single_long_word() {
+        assert_eq!(truncate_to_words("superlongwordthatdoesnotfit", 10), "superlon..");
+    }
+
+    #[test]
+    fn test_truncate_to_words_exact_fit() {
+        assert_eq!(truncate_to_words("Fix auth", 8), "Fix auth");
+    }
+
+    #[test]
+    fn test_truncate_to_words_two_words_then_dot() {
+        assert_eq!(truncate_to_words("Refactor the entire authentication flow", 16), "Refactor the..");
     }
 }

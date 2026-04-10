@@ -107,7 +107,10 @@ mod tests {
         let s = err.to_string();
         assert!(s.contains("Error:"), "should contain 'Error:'");
         assert!(s.contains("Hint:"), "should contain 'Hint:'");
-        assert!(s.contains("ANTHROPIC_API_KEY"), "should include env var name");
+        assert!(
+            s.contains("ANTHROPIC_API_KEY"),
+            "should include env var name"
+        );
     }
 
     #[test]

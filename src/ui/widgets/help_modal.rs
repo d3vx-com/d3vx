@@ -61,6 +61,48 @@ impl Widget for HelpModal {
 
         let mut text = Vec::new();
 
+        // 0. Getting Started
+        text.push(Line::from(vec![
+            Span::styled("─ Getting Started ", Style::default().fg(self.theme.brand)),
+            Span::styled(
+                "─────────────────────────────────────",
+                Style::default().fg(self.theme.ui.border),
+            ),
+        ]));
+
+        let steps = [
+            ("1.", "Describe what you want done"),
+            ("2.", "Review the result in the conversation"),
+            ("3.", "Approve changes or ask for adjustments"),
+        ];
+        for (num, desc) in steps {
+            text.push(Line::from(vec![
+                Span::styled(
+                    format!("  {} ", num),
+                    Style::default()
+                        .fg(self.theme.brand)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(desc, Style::default().fg(self.theme.ui.text)),
+            ]));
+        }
+
+        text.push(Line::from(vec![
+            Span::styled("  Add ", Style::default().fg(self.theme.ui.text_dim)),
+            Span::styled(
+                "--vex ",
+                Style::default()
+                    .fg(self.theme.brand_secondary)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "to run a task in an isolated worktree.",
+                Style::default().fg(self.theme.ui.text_dim),
+            ),
+        ]));
+
+        text.push(Line::from(""));
+
         // 1. Keyboard Shortcuts
         text.push(Line::from(vec![
             Span::styled(
@@ -78,7 +120,7 @@ impl Widget for HelpModal {
             ("\\ + Enter", "New line"),
             ("↑ / ↓", "History navigation"),
             ("Ctrl+C", "Cancel / Quit"),
-            ("Ctrl+P", "Power Mode (Advanced stats)"),
+            ("Ctrl+1-4", "Switch right panel tab"),
             ("Ctrl+L", "Toggle sidebar"),
             ("Ctrl+O", "Toggle tools (selected agent)"),
             ("Esc", "Dismiss modal / Stop agent"),

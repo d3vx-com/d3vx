@@ -20,7 +20,8 @@ pub fn static_dir() -> &'static str {
     DIR_PATH.get_or_init(|| {
         // We extract the embedded files to a temp dir so that ServeDir
         // can read them via the real filesystem.
-        let tmp = std::env::temp_dir().join(format!("d3vx-dashboard-static-{}", std::process::id()));
+        let tmp =
+            std::env::temp_dir().join(format!("d3vx-dashboard-static-{}", std::process::id()));
         if !tmp.join("index.html").exists() {
             let _ = std::fs::create_dir_all(&tmp);
             extract_dir(&STATIC_DIR, &tmp);

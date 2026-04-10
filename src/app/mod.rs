@@ -101,6 +101,10 @@ pub struct App {
     pub animation_frame: u64,
     /// Last update time
     pub last_update: Instant,
+    /// Whether the UI needs to be redrawn
+    pub needs_redraw: bool,
+    /// Cached count of running subagents (for render, to avoid block_in_place)
+    pub cached_subagent_count: usize,
     /// Model Registry
     pub registry: Arc<tokio::sync::RwLock<crate::providers::ModelRegistry>>,
     /// Last git status refresh

@@ -52,7 +52,7 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub parallel_agents: bool,
 
-    /// Run task in Vex mode (background, isolated worktree, autonomous)
+    /// Run task in the background (isolated worktree, autonomous)
     #[arg(long, global = true)]
     pub vex: bool,
 
@@ -156,7 +156,7 @@ pub enum CliCommand {
         #[arg(long)]
         role: Option<String>,
 
-        /// Queue the task for background Orchestrator Daemon
+        /// Queue the task for background execution
         #[arg(long)]
         queue: bool,
     },
@@ -236,7 +236,7 @@ pub enum CliCommand {
         action: AutonomousAction,
     },
 
-    /// Run a specific task by ID (used by Vex mode for detached execution)
+    /// Run a specific task by ID (used for background execution)
     Task {
         /// Task ID to run
         task_id: String,

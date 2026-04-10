@@ -211,3 +211,74 @@ fn test_token_estimation() {
     assert!(conv.total_tokens() > 0);
     assert!(conv.total_tokens() < 20);
 }
+
+#[test]
+fn test_compact_drain_returns_removed_messages() {
+    let mut conv = Conversation::new();
+    for i in 0..10 {
+        conv.add_user_text(format!("Message {i}"));
+    }
+    assert_eq!(conv.len(), 10);
+
+    let drained = conv.compact_drain(3);
+    // Kept: first + 3 recent = 4
+    assert_eq!(conv.len(), 4);
+    // Drained: 10 - 4 = 6
+    assert_eq!(drained.len(), 6);
+    // First message preserved
+    assert_eq!(conv.get_messages()[0].as_text().unwrap(), "Message 0");
+    // Last message preserved
+    assert_eq!(
+        conv.get_messages().last().unwrap().as_text().unwrap(),
+        "Message 9"
+    );
+}
+
+#[test]
+fn test_compact_drain_preserves_token_count() {
+    let mut conv = Conversation::new();
+    for i in 0..8 {
+        conv.add_user_text(format!("Test message number {i}"));
+    }
+    let tokens_before = conv.total_tokens();
+    let drained = conv.compact_drain(2);
+    assert!(!drained.is_empty());
+    // Token count should be recalculated for remaining messages only
+    assert!(conv.total_tokens() < tokens_before);
+}
+
+#[test]
+fn test_compact_drain_empty_when_few_messages() {
+    let mut conv = Conversation::new();
+    conv.add_user_text("One");
+    conv.add_user_text("Two");
+    let drained = conv.compact_drain(6);
+    assert!(drained.is_empty());
+    assert_eq!(conv.len(), 2);
+}
+
+#[test]
+fn test_insert_after_first() {
+    let mut conv = Conversation::new();
+    conv.add_user_text("System context");
+    conv.add_user_text("Existing message");
+    assert_eq!(conv.len(), 2);
+
+    conv.insert_after_first(Message::user_text("Inserted summary"));
+    let msgs = conv.get_messages();
+    assert_eq!(msgs.len(), 3);
+    assert_eq!(msgs[0].as_text().unwrap(), "System context");
+    assert_eq!(msgs[1].as_text().unwrap(), "Inserted summary");
+    assert_eq!(msgs[2].as_text().unwrap(), "Existing message");
+}
+
+#[test]
+fn test_insert_after_first_single_message() {
+    let mut conv = Conversation::new();
+    conv.add_user_text("Only message");
+    conv.insert_after_first(Message::user_text("Appended"));
+    let msgs = conv.get_messages();
+    assert_eq!(msgs.len(), 2);
+    assert_eq!(msgs[0].as_text().unwrap(), "Only message");
+    assert_eq!(msgs[1].as_text().unwrap(), "Appended");
+}

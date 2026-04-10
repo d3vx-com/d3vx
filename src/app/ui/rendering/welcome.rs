@@ -51,10 +51,10 @@ impl App {
                     Style::default().fg(color).add_modifier(Modifier::BOLD),
                 )];
 
-                // Add "VEX_MODE" tag next to the robot head
+                // Add background task indicator next to the robot head
                 if i == 1 && is_vex_active {
                     spans.push(Span::styled(
-                        " [ VEX_MODE ]",
+                        " [ Background ]",
                         Style::default()
                             .fg(secondary_color)
                             .add_modifier(Modifier::BOLD),
@@ -135,9 +135,20 @@ impl App {
 
             lines.push(Line::raw(""));
             lines.push(Line::from(vec![Span::styled(
-                "  type a message or /help",
+                "  Describe what you'd like done, or type /help for options",
                 Style::default().fg(dim_color),
             )]));
+            lines.push(Line::raw(""));
+            lines.push(Line::from(vec![
+                Span::styled("  1. ", Style::default().fg(dim_color)),
+                Span::styled("Ask", Style::default().fg(brand_color)),
+                Span::styled(" — describe the task  ", Style::default().fg(dim_color)),
+                Span::styled("2. ", Style::default().fg(dim_color)),
+                Span::styled("Review", Style::default().fg(brand_color)),
+                Span::styled(" — check the result  ", Style::default().fg(dim_color)),
+                Span::styled("3. ", Style::default().fg(dim_color)),
+                Span::styled("Approve", Style::default().fg(brand_color)),
+            ]));
         }
 
         let paragraph = Paragraph::new(lines).alignment(ratatui::layout::Alignment::Left);

@@ -1,8 +1,8 @@
 //! Commander Validation Tests
 
-use super::types::{ValidationCommand, ValidationKind, ValidationResult};
-use super::runner::ValidationRunner;
 use super::runner::parse_output_issues;
+use super::runner::ValidationRunner;
+use super::types::{ValidationCommand, ValidationKind, ValidationResult};
 
 #[test]
 fn test_validation_kind_display() {

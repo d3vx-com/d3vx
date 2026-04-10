@@ -390,7 +390,11 @@ mod tests {
             "Checkpoint should be restorable after update"
         );
         let loaded = restored.unwrap();
-        assert_eq!(loaded.task.status, TaskStatus::InProgress, "Check if task status is correctly restored as InProgress");
+        assert_eq!(
+            loaded.task.status,
+            TaskStatus::InProgress,
+            "Check if task status is correctly restored as InProgress"
+        );
         assert_eq!(loaded.task.phase, Phase::Docs);
     }
 
@@ -457,7 +461,11 @@ mod tests {
             "Should have blocking review"
         );
         assert!(readiness.has_blocking_docs(), "Should have blocking docs");
-        assert_eq!(readiness.reasons.len(), 3, "Ensure all reasons for blocking are captured");
+        assert_eq!(
+            readiness.reasons.len(),
+            3,
+            "Ensure all reasons for blocking are captured"
+        );
     }
 
     #[test]
@@ -542,7 +550,11 @@ mod tests {
         });
 
         let trust_1 = UnifiedTrustData::from_metadata(&iter_1_metadata);
-        assert_eq!(trust_1.qa_iteration(), 1, "QA iteration should be parsed from metadata");
+        assert_eq!(
+            trust_1.qa_iteration(),
+            1,
+            "QA iteration should be parsed from metadata"
+        );
         assert!(!trust_1.needs_escalation());
         assert!(!trust_1.is_merge_ready());
 

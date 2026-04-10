@@ -723,13 +723,22 @@ mod tests {
                     "agent should not be running"
                 );
             }
-            RestoreStatus::Blocked { failed_checks, reasons } => {
+            RestoreStatus::Blocked {
+                failed_checks,
+                reasons,
+            } => {
                 if failed_checks.contains(&RestoreCheck::NoConflicts) {
                     // Acceptable failure due to missing git repo
                     assert_eq!(reasons.len(), 1);
-                    assert!(reasons[0].contains("Git diff check failures"), "Expected git diff usage error");
+                    assert!(
+                        reasons[0].contains("Git diff check failures"),
+                        "Expected git diff usage error"
+                    );
                 } else {
-                    panic!("Expected CanRestore or acceptable Blocked due to Git, got reasons: {:?}", reasons);
+                    panic!(
+                        "Expected CanRestore or acceptable Blocked due to Git, got reasons: {:?}",
+                        reasons
+                    );
                 }
             }
             RestoreStatus::AlreadyRunning => {

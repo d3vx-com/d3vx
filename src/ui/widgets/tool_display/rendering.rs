@@ -196,7 +196,60 @@ impl<'a> ToolDisplay<'a> {
         } else {
             self.theme.ui.text_dim
         };
-        let prefix = if is_error { "Error: " } else { "" };
+
+        // Context-aware error prefix — only for first line, avoid duplication
+        let (context_prefix, dedup_path) = if is_error {
+            match self.name {
+                "EditTool" | "MultiEditTool" => {
+                    let path = self
+                        .input
+                        .get("file_path")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    (
+                        if path.is_empty() {
+                            "Edit failed".to_string()
+                        } else {
+                            format!("Edit failed: {}", path)
+                        },
+                        Some(path.to_string()),
+                    )
+                }
+                "WriteTool" | "Write" => {
+                    let path = self
+                        .input
+                        .get("file_path")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    (
+                        if path.is_empty() {
+                            "Write failed".to_string()
+                        } else {
+                            format!("Write failed: {}", path)
+                        },
+                        Some(path.to_string()),
+                    )
+                }
+                "BashTool" | "Bash" => {
+                    let cmd = self.input.get("command").and_then(|v| v.as_str());
+                    (
+                        cmd.map(|c| {
+                            let display = if c.len() > 50 {
+                                format!("{}...", &c[..47])
+                            } else {
+                                c.to_string()
+                            };
+                            format!("Command failed: `{}`", display)
+                        })
+                        .unwrap_or_else(|| "Command failed".to_string()),
+                        None,
+                    )
+                }
+                _ => (String::new(), None),
+            }
+        } else {
+            (String::new(), None)
+        };
 
         let mut output_to_render = output.to_string();
 
@@ -218,8 +271,25 @@ impl<'a> ToolDisplay<'a> {
             .filter(|l| !l.is_empty())
             .collect();
 
+        // Strip duplicate file path and generic "Error:" prefix from raw output lines
+        // to avoid "Edit failed: foo.rs: Error: old_string not found in foo.rs"
+        let clean_line = |raw: &str| -> String {
+            let mut s = raw.trim_end().to_string();
+            if let Some(ref path) = dedup_path {
+                if !path.is_empty() && s.contains(path.as_str()) {
+                    s = s.replace(path.as_str(), "");
+                    s = s.replace("  ", " ");
+                }
+            }
+            // Strip leading "Error: " since our context_prefix handles it
+            if is_error {
+                s = s.strip_prefix("Error: ").unwrap_or(&s).to_string();
+                s = s.strip_prefix("error: ").unwrap_or(&s).to_string();
+            }
+            s.trim_start().to_string()
+        };
+
         let truncate_line = |s: &str| -> String {
-            let s = s.trim_end();
             if s.len() > self.config.max_width.saturating_sub(10) {
                 format!("{}...", &s[..self.config.max_width.saturating_sub(13)])
             } else {
@@ -227,7 +297,39 @@ impl<'a> ToolDisplay<'a> {
             }
         };
 
-        if all_lines.len() <= 3 || self.config.verbose {
+        // Show context_prefix as first line, then cleaned output
+        if !context_prefix.is_empty() && !non_empty_lines.is_empty() {
+            lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled(
+                    truncate_line(&clean_line(non_empty_lines[0])),
+                    Style::default().fg(color),
+                ),
+            ]));
+            // Remaining lines without prefix
+            let remaining: Vec<&&str> = non_empty_lines.iter().skip(1).collect();
+            for line in remaining.iter().take(self.config.max_output_lines) {
+                lines.push(Line::from(vec![
+                    Span::raw("    "),
+                    Span::styled(truncate_line(&clean_line(line)), Style::default().fg(color)),
+                ]));
+            }
+            if remaining.len() > self.config.max_output_lines {
+                lines.push(Line::from(vec![
+                    Span::raw("    "),
+                    Span::styled(
+                        format!(
+                            "... ({} more lines)",
+                            remaining.len() - self.config.max_output_lines
+                        ),
+                        Style::default()
+                            .fg(self.theme.ui.text_muted)
+                            .add_modifier(Modifier::ITALIC),
+                    ),
+                ]));
+            }
+        } else if all_lines.len() <= 3 || self.config.verbose {
+            let prefix = if is_error { "Error: " } else { "" };
             let limit = self.config.max_output_lines.min(all_lines.len());
             for line in all_lines.iter().take(limit) {
                 lines.push(Line::from(vec![
@@ -255,7 +357,7 @@ impl<'a> ToolDisplay<'a> {
                 lines.push(Line::from(vec![
                     Span::raw("    "),
                     Span::styled(
-                        format!("{}{}", prefix, truncate_line(first)),
+                        truncate_line(&clean_line(first)),
                         Style::default().fg(color),
                     ),
                 ]));
@@ -278,7 +380,7 @@ impl<'a> ToolDisplay<'a> {
                         lines.push(Line::from(vec![
                             Span::raw("    "),
                             Span::styled(
-                                format!("{}{}", prefix, truncate_line(last)),
+                                truncate_line(&clean_line(last)),
                                 Style::default().fg(color),
                             ),
                         ]));
