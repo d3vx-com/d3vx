@@ -145,12 +145,11 @@ impl App {
         if let Some(activity_rect) = activity_area {
             self.layout.last_activity_rect = Some(activity_rect);
 
-            // Draw a subtle right border on the chat area using a Block
+            // Draw a left border on the sidebar for visual separation
             let border_block = Block::default()
-                .borders(Borders::RIGHT)
-                .border_style(Style::default().fg(Color::Rgb(40, 40, 50)))
+                .borders(Borders::LEFT)
+                .border_style(Style::default().fg(Color::Rgb(60, 60, 75)))
                 .border_type(BorderType::Plain);
-            // The border renders 1 col into the sidebar, so we offset
             let sidebar_inner = border_block.inner(activity_rect);
             f.render_widget(border_block, activity_rect);
             self.render_activity_panel(f, sidebar_inner);
