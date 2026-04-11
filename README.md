@@ -191,22 +191,11 @@ At a high level, the runtime is built around:
 - Poller-driven GitHub intake
 - Daemon-backed background execution and recovery
 
-## What Still Needs Work
-
-- Full end-to-end test stabilization
-- Broader CLI implementation beyond the TUI
-- More complete kanban/list interactions
-- Production hardening around recovery
-- Hosted webhook mode
-- Fully automatic conflict repair across all execution modes
-
 ## Development Status
 
-- **Architecturally**: Substantial — ~126K lines of Rust across 643 files, 42 tools, 1379+ tests
-- **Functionally**: Usable in the TUI with real background task execution
-- **Production readiness**: Not yet — beyond prototype stage but not at broad team rollout level
-
-You can use d3vx today if you want an experimental but serious AI coding TUI with background isolated task execution. Do not treat it as production-ready for enterprise deployment.
+- **Architecturally**: ~140K lines of Rust across 688 files, 40+ tools, 2176+ tests
+- **Functionally**: Full TUI with background task execution, web dashboard, multi-provider support
+- **Production readiness**: Beta — functional for daily use, actively hardened
 
 ## License
 
