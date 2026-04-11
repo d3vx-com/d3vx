@@ -65,6 +65,10 @@ pub struct UIState {
     pub multiline_pending: bool,
     /// Lightweight chat focus preset shown above the prompt
     pub focus_mode: FocusMode,
+    /// Actual pasted content for large pastes (displayed as summary in input_buffer)
+    pub pending_paste: Option<String>,
+    /// The display text shown in input_buffer for large pastes (e.g. "[Pasted ~42 lines, 1.2K chars]")
+    pub paste_preview: Option<String>,
 
     // ════════════════════════════════════════════════════════════════════════════
     // Sidebar State
@@ -187,6 +191,8 @@ impl Default for UIState {
             cursor_position: 0,
             multiline_pending: false,
             focus_mode: FocusMode::default(),
+            pending_paste: None,
+            paste_preview: None,
 
             right_sidebar_visible: true,
             agent_monitor_pinned: false,

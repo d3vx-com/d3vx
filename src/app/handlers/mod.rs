@@ -22,6 +22,7 @@ impl App {
                 }
             }
             Event::Mouse(mouse) => self.handle_mouse_event(mouse)?,
+            Event::Paste(text) => self.handle_paste(text)?,
             Event::Resize(_, _) => {}
             Event::FocusGained => {}
             Event::FocusLost => {}
@@ -254,24 +255,15 @@ impl App {
                     }
                 }
 
-                // Check Mode Bar click
+                // Check Mode Bar click — click on the badge to cycle modes
                 if let Some(ref mode_rect) = self.layout.last_mode_bar_rect {
                     if x >= mode_rect.x
                         && x < mode_rect.x + mode_rect.width
                         && y >= mode_rect.y
                         && y < mode_rect.y + mode_rect.height
                     {
-                        // Calculate position relative to mode bar
-                        let rel_x = (x - mode_rect.x) as usize;
-                        // "Mode " = 5 chars, then each mode is " Mode " = 6 chars
-                        if rel_x >= 5 {
-                            let mode_index = (rel_x - 5) / 6;
-                            let modes = crate::app::state::FocusMode::ALL;
-                            if mode_index < modes.len() {
-                                self.ui.focus_mode = modes[mode_index];
-                                return Ok(());
-                            }
-                        }
+                        self.ui.focus_mode = self.ui.focus_mode.cycle(false);
+                        return Ok(());
                     }
                 }
 

@@ -45,6 +45,8 @@ impl App {
                     // Empty the input buffer instead of quitting directly
                     self.ui.input_buffer.clear();
                     self.ui.cursor_position = 0;
+                    self.ui.pending_paste = None;
+                    self.ui.paste_preview = None;
                     self.clear_mention_picker();
                 } else {
                     // First Ctrl+C when idle - set should_quit and show hint
@@ -199,10 +201,9 @@ impl App {
                 self.cycle_git_change(1);
             }
 
-            // Focus-mode cycling
-            (KeyCode::Tab, mods) if mods.contains(KeyModifiers::CONTROL) => {
-                let reverse = mods.contains(KeyModifiers::SHIFT);
-                self.ui.focus_mode = self.ui.focus_mode.cycle(reverse);
+            // Focus-mode cycling (Ctrl+F — universal, works in all terminals)
+            (KeyCode::Char('f'), KeyModifiers::CONTROL) => {
+                self.ui.focus_mode = self.ui.focus_mode.cycle(false);
                 self.add_notification(
                     format!("Focus mode: {}", self.ui.focus_mode.label()),
                     crate::app::state::NotificationType::Info,
@@ -213,6 +214,8 @@ impl App {
             (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
                 self.ui.input_buffer.clear();
                 self.ui.cursor_position = 0;
+                self.ui.pending_paste = None;
+                self.ui.paste_preview = None;
                 self.clear_mention_picker();
             }
 

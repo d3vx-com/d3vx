@@ -27,6 +27,8 @@ pub enum Event {
     FocusGained,
     /// Focus lost
     FocusLost,
+    /// Pasted text (bracketed paste)
+    Paste(String),
     /// Tick event (for animation)
     Tick,
     /// IPC event
@@ -188,8 +190,17 @@ impl EventHandler {
         rt: tokio::runtime::Handle,
     ) -> Result<()> {
         std::thread::spawn(move || {
-            // Enable mouse capture
-            let _ = crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture);
+            // Enable mouse capture, bracketed paste, and keyboard enhancements.
+            // DISAMBIGUATE_ESCAPE_CODES lets the terminal distinguish modifier
+            // keys (e.g. Ctrl+Tab vs Tab) via the kitty keyboard protocol.
+            let _ = crossterm::execute!(
+                std::io::stdout(),
+                crossterm::event::EnableMouseCapture,
+                crossterm::event::EnableBracketedPaste,
+                crossterm::event::PushKeyboardEnhancementFlags(
+                    crossterm::event::KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                )
+            );
 
             loop {
                 match crossterm::event::poll(Duration::from_millis(16)) {
@@ -209,7 +220,12 @@ impl EventHandler {
                 }
             }
 
-            let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
+            let _ = crossterm::execute!(
+                std::io::stdout(),
+                crossterm::event::PopKeyboardEnhancementFlags,
+                crossterm::event::DisableBracketedPaste,
+                crossterm::event::DisableMouseCapture
+            );
         });
 
         Ok(())
@@ -321,7 +337,8 @@ impl EventHandler {
             CrosstermEvent::Resize(w, h) => Some(Event::Resize(w, h)),
             CrosstermEvent::FocusGained => Some(Event::FocusGained),
             CrosstermEvent::FocusLost => Some(Event::FocusLost),
-            _ => None,
+            CrosstermEvent::Paste(text) => Some(Event::Paste(text)),
+            // Future crossterm event variants are safely ignored
         }
     }
 

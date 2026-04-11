@@ -6,50 +6,47 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui::Frame;
 
+use crate::app::state::FocusMode;
 use crate::app::App;
-use crate::ui::icons;
 
 impl App {
-    /// Render input area (Timeline style)
+    /// Render input area — mode badge + prompt on row 1, hint strip on row 2
     pub fn render_input(&mut self, f: &mut Frame, area: Rect) {
         let inner_area = area.inner(ratatui::layout::Margin {
             horizontal: 1,
             vertical: 0,
         });
+
+        // Split: input line (Min) + hint strip (Length 1)
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Min(1)])
+            .constraints([Constraint::Min(1), Constraint::Length(1)])
             .split(inner_area);
 
-        let mut mode_spans = vec![Span::styled(
-            "Mode ",
-            Style::default().fg(self.ui.theme.ui.text_dim),
-        )];
-        for mode in crate::app::state::FocusMode::ALL {
-            let active = self.ui.focus_mode == mode;
-            mode_spans.push(Span::styled(
-                format!(" {} ", mode.label()),
-                if active {
-                    Style::default()
-                        .bg(self.ui.theme.brand)
-                        .fg(Color::Black)
-                        .add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default()
-                        .bg(Color::Rgb(34, 34, 40))
-                        .fg(self.ui.theme.ui.text_muted)
-                },
-            ));
-            mode_spans.push(Span::raw(" "));
-        }
-        mode_spans.push(Span::styled(
-            "Ctrl+Tab cycle",
-            Style::default().fg(self.ui.theme.ui.text_dim),
-        ));
+        let input_area = chunks[0];
+        let hint_area = chunks[1];
+
+        // ── Input line: [MODE] → prompt ──
+
+        let mode = self.ui.focus_mode;
+        let mode_label = mode.label();
+
+        // Badge style: Chat is subtle, others use brand color
+        let badge_style = if mode == FocusMode::Chat {
+            Style::default()
+                .bg(Color::Rgb(40, 40, 48))
+                .fg(Color::Rgb(120, 120, 135))
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+                .bg(self.ui.theme.brand)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD)
+        };
 
         let mut prompt = self.ui.input_buffer.clone();
 
-        // Add vertical blinking indicator
+        // Blinking cursor
         let cursor_char = if (self.animation_frame / 4) % 2 == 0 {
             "\u{2503}"
         } else {
@@ -61,22 +58,23 @@ impl App {
             prompt.push_str(cursor_char);
         }
 
-        // Smart Highlighting
-        let mut spans = vec![Span::styled(
-            "\u{2192} ",
-            Style::default().fg(Color::Rgb(80, 200, 120)),
-        )];
+        // Build input spans: [MODE] → prompt
+        let mut spans = vec![
+            Span::styled(format!(" {} ", mode_label), badge_style),
+            Span::raw(" "),
+            Span::styled("\u{2192} ", Style::default().fg(Color::Rgb(80, 200, 120))),
+        ];
 
         let tokens: Vec<&str> = prompt.split_inclusive(char::is_whitespace).collect();
 
-        // If it's empty, show a subtle placeholder
         if tokens.is_empty() || (tokens.len() == 1 && tokens[0] == cursor_char) {
+            // Empty input — show subtle placeholder
             spans.push(Span::styled(
-                self.ui.focus_mode.hint(),
-                Style::default().fg(Color::Rgb(100, 100, 110)),
+                "Type a message...",
+                Style::default().fg(Color::Rgb(80, 80, 90)),
             ));
             if tokens.len() == 1 && tokens[0] == cursor_char {
-                spans.insert(1, Span::raw(cursor_char));
+                spans.insert(3, Span::raw(cursor_char));
             }
         } else {
             for token in tokens {
@@ -100,13 +98,27 @@ impl App {
             }
         }
 
-        // Render the text into the inner area with wrapping
-        self.layout.last_mode_bar_rect = Some(chunks[0]);
-        let mode_bar = Paragraph::new(Line::from(mode_spans)).wrap(Wrap { trim: false });
-        let paragraph = Paragraph::new(Line::from(spans)).wrap(Wrap { trim: false });
+        // ── Hint strip: mode description + Ctrl+Tab ──
+
+        let hint_line = Line::from(vec![
+            Span::styled(
+                format!(" {} ", mode.hint()),
+                Style::default().fg(Color::Rgb(70, 70, 82)),
+            ),
+            Span::styled("Ctrl+F cycle", Style::default().fg(Color::Rgb(45, 45, 55))),
+        ]);
+
+        // Render
+        self.layout.last_mode_bar_rect = Some(hint_area);
         f.render_widget(Clear, area);
-        f.render_widget(mode_bar, chunks[0]);
-        f.render_widget(paragraph, chunks[1]);
+        f.render_widget(
+            Paragraph::new(Line::from(spans)).wrap(Wrap { trim: false }),
+            input_area,
+        );
+        f.render_widget(
+            Paragraph::new(hint_line).wrap(Wrap { trim: false }),
+            hint_area,
+        );
     }
 
     /// Render the bottom status bar
@@ -120,15 +132,14 @@ impl App {
         };
 
         let (status_icon, status_color) = if self.agents.is_connected {
-            (icons::status::check(), Color::Rgb(80, 200, 120))
+            ("\u{2713}", Color::Rgb(80, 200, 120)) // ✓
         } else {
-            (icons::status::x(), Color::Rgb(220, 100, 100))
+            ("\u{2717}", Color::Rgb(220, 100, 100)) // ✗
         };
 
         let status_text = format!(
-            "{} \u{2022} {} {} \u{2022} ${} \u{2022} {} queued | / commands \u{2022} @ mentions",
+            "{} \u{2022} \u{2387} {} \u{2022} ${} \u{2022} {} queued | / commands \u{2022} @ mentions",
             self.model.as_deref().unwrap_or("claude"),
-            icons::git::branch(),
             self.active_branch,
             cost_str,
             self.session.message_queue.len()

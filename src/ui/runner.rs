@@ -91,31 +91,35 @@ async fn run_standalone_mode(opts: TuiOptions) -> Result<()> {
     app.apply_initial_ui_mode(opts.ui_mode.as_deref());
     let result = app.run(&mut terminal).await;
 
-    // Clean up terminal state before exiting
-    cleanup_terminal()?;
+    // Restore terminal: leave alt screen, disable mouse, then disable raw mode.
+    // Order matters — writing escape sequences while in raw mode causes garbage.
     terminal::disable_raw_mode()?;
+    cleanup_terminal()?;
 
     result
 }
 
-/// Clean up terminal state for a clean exit
+/// Clean up terminal state for a clean exit.
+///
+/// Must be called AFTER `disable_raw_mode()` so escape sequences
+/// are processed correctly by the terminal.
 fn cleanup_terminal() -> Result<()> {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
 
-    // Clear entire screen and move cursor to home position
+    // Show cursor and leave alternate screen first
     execute!(handle, crossterm::cursor::Show)?;
+    execute!(handle, LeaveAlternateScreen)?;
+
+    // Disable mouse capture
+    execute!(handle, DisableMouseCapture)?;
+
+    // Clear the real screen (now visible after leaving alt screen)
     execute!(handle, crossterm::cursor::MoveTo(0, 0))?;
     execute!(
         handle,
         crossterm::terminal::Clear(crossterm::terminal::ClearType::All)
     )?;
-
-    // Leave alternate screen properly
-    execute!(handle, LeaveAlternateScreen)?;
-
-    // Disable mouse capture
-    execute!(handle, DisableMouseCapture)?;
 
     // Reset any styles
     execute!(handle, crossterm::style::ResetColor)?;
