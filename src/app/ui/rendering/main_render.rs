@@ -2,7 +2,7 @@
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::app::state::NotificationType;
@@ -141,23 +141,19 @@ impl App {
             f.render_widget(messages, chat_inner_area);
         }
 
-        // Render activity panel with a subtle left-edge tint for visual separation
+        // Render activity panel with ratatui border separator
         if let Some(activity_rect) = activity_area {
-            // Tint the first column of the sidebar to create a contrast edge
-            let edge_x = activity_rect.x;
-            let edge_style = Style::default().bg(Color::Rgb(20, 20, 26));
-            for y in activity_rect.top()..activity_rect.bottom() {
-                #[allow(deprecated)]
-                {
-                    f.buffer_mut()
-                        .get_mut(edge_x, y)
-                        .set_char(' ')
-                        .set_style(edge_style);
-                }
-            }
-
             self.layout.last_activity_rect = Some(activity_rect);
-            self.render_activity_panel(f, activity_rect);
+
+            // Draw a subtle right border on the chat area using a Block
+            let border_block = Block::default()
+                .borders(Borders::RIGHT)
+                .border_style(Style::default().fg(Color::Rgb(40, 40, 50)))
+                .border_type(BorderType::Plain);
+            // The border renders 1 col into the sidebar, so we offset
+            let sidebar_inner = border_block.inner(activity_rect);
+            f.render_widget(border_block, activity_rect);
+            self.render_activity_panel(f, sidebar_inner);
         }
 
         // Render input
