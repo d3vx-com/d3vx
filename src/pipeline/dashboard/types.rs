@@ -60,6 +60,21 @@ pub struct BudgetInfo {
     pub paused: bool,
 }
 
+/// A single row in the tool execution feed. Mirrors the
+/// `tool_executions` table but collapses the JSON input to a short
+/// preview string so the UI doesn't have to render arbitrary JSON.
+#[derive(Debug, Clone, Serialize)]
+pub struct ToolExecutionRow {
+    pub id: i64,
+    pub session_id: String,
+    pub tool_name: String,
+    /// First ~200 chars of the JSON-serialised input, for a preview.
+    pub input_preview: String,
+    pub is_error: bool,
+    pub duration_ms: Option<i64>,
+    pub created_at: String,
+}
+
 /// Generic API message envelope.
 #[derive(Debug, Clone, Serialize)]
 pub struct ApiResponse<T: Serialize> {

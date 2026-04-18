@@ -167,8 +167,190 @@ impl App {
         self.needs_redraw = true;
     }
 
-    /// Poll for completed tools (placeholder)
+    /// Rehydrate the `recent_tools` activity panel from the persisted
+    /// [`tool_executions`](crate::store::ToolExecutionStore) table when
+    /// there is nothing live to show.
+    ///
+    /// The panel is normally fed by live IPC events from the attached
+    /// agent. On TUI restart — or in standalone / inspect-only modes —
+    /// there are no events; without this, the panel sits empty even
+    /// when the DB holds the full tool history for the session.
+    ///
+    /// Guard conditions:
+    /// * `recent_tools` is already non-empty → IPC is live, skip.
+    /// * No DB handle or no session ID → nothing to query, skip.
+    /// * DB read fails → log at debug and leave the panel empty.
     pub fn poll_tool_executions(&mut self) -> Result<()> {
+        if !self.tools.recent_tools.is_empty() {
+            return Ok(());
+        }
+
+        let Some(session_id) = self.session.session_id.clone() else {
+            return Ok(());
+        };
+        let Some(db_handle) = self.db.clone() else {
+            return Ok(());
+        };
+
+        let records = {
+            let db = db_handle.lock();
+            let store = crate::store::ToolExecutionStore::new(&db);
+            match store.list_for_session(&session_id) {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::debug!(
+                        error = %e,
+                        session = %session_id,
+                        "tool audit rehydration skipped"
+                    );
+                    return Ok(());
+                }
+            }
+        };
+
+        const MAX_REHYDRATE: usize = 20;
+        self.tools
+            .recent_tools
+            .extend(records_to_tool_states(records, MAX_REHYDRATE));
+
         Ok(())
+    }
+}
+
+/// Convert audit records into UI-side tool-execution states.
+///
+/// Pure helper so the tricky bits (JSON re-parse, duration clamping,
+/// most-recent-N windowing) are testable without a full `App`.
+pub(super) fn records_to_tool_states(
+    records: Vec<crate::store::ToolExecutionRecord>,
+    limit: usize,
+) -> Vec<crate::app::state::ToolExecutionState> {
+    let skip = records.len().saturating_sub(limit);
+    records
+        .into_iter()
+        .skip(skip)
+        .map(|record| {
+            let input = serde_json::from_str::<serde_json::Value>(&record.tool_input)
+                .unwrap_or(serde_json::Value::Null);
+            // `duration_ms` is `i64` in storage but logically unsigned;
+            // clamp to avoid surprising wrap on malformed rows.
+            let elapsed_ms = record.duration_ms.unwrap_or(0).max(0) as u64;
+            crate::app::state::ToolExecutionState {
+                // Prefix rehydrated IDs so they can't collide with
+                // live IPC tool IDs (UUIDs) that arrive after this.
+                id: format!("audit-{}", record.id),
+                name: record.tool_name,
+                input,
+                start_time: std::time::Instant::now(),
+                is_executing: false,
+                output: record.tool_result,
+                is_error: record.is_error,
+                elapsed_ms,
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::records_to_tool_states;
+    use crate::store::ToolExecutionRecord;
+
+    fn rec(id: i64, name: &str, is_err: bool, dur: Option<i64>) -> ToolExecutionRecord {
+        ToolExecutionRecord {
+            id,
+            session_id: "s1".to_string(),
+            tool_name: name.to_string(),
+            tool_input: r#"{"path":"foo"}"#.to_string(),
+            tool_result: Some("result".to_string()),
+            is_error: is_err,
+            duration_ms: dur,
+            created_at: "2026-04-19T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn records_to_tool_states_preserves_order_within_limit() {
+        let records = vec![
+            rec(1, "Read", false, Some(10)),
+            rec(2, "Bash", false, Some(20)),
+            rec(3, "Edit", false, Some(30)),
+        ];
+        let states = records_to_tool_states(records, 20);
+        assert_eq!(states.len(), 3);
+        assert_eq!(states[0].name, "Read");
+        assert_eq!(states[1].name, "Bash");
+        assert_eq!(states[2].name, "Edit");
+    }
+
+    #[test]
+    fn records_to_tool_states_keeps_most_recent_when_over_limit() {
+        // Input is oldest-first; we keep the last N to show the most
+        // recent activity (the panel is a "what just happened" view).
+        let records: Vec<_> = (0..30)
+            .map(|i| rec(i as i64, &format!("Tool{i}"), false, Some(i as i64)))
+            .collect();
+        let states = records_to_tool_states(records, 5);
+        assert_eq!(states.len(), 5);
+        assert_eq!(states[0].name, "Tool25");
+        assert_eq!(states[4].name, "Tool29");
+    }
+
+    #[test]
+    fn records_to_tool_states_prefixes_ids_to_avoid_collision() {
+        let records = vec![rec(42, "Read", false, Some(5))];
+        let states = records_to_tool_states(records, 20);
+        assert_eq!(states[0].id, "audit-42");
+    }
+
+    #[test]
+    fn records_to_tool_states_marks_rehydrated_as_not_executing() {
+        let records = vec![rec(1, "Read", false, Some(10))];
+        let states = records_to_tool_states(records, 20);
+        assert!(!states[0].is_executing);
+    }
+
+    #[test]
+    fn records_to_tool_states_handles_missing_duration() {
+        let records = vec![rec(1, "Read", false, None)];
+        let states = records_to_tool_states(records, 20);
+        assert_eq!(states[0].elapsed_ms, 0);
+    }
+
+    #[test]
+    fn records_to_tool_states_clamps_negative_duration_to_zero() {
+        let records = vec![rec(1, "Read", false, Some(-5))];
+        let states = records_to_tool_states(records, 20);
+        assert_eq!(states[0].elapsed_ms, 0);
+    }
+
+    #[test]
+    fn records_to_tool_states_round_trips_error_flag() {
+        let records = vec![rec(1, "Bash", true, Some(10))];
+        let states = records_to_tool_states(records, 20);
+        assert!(states[0].is_error);
+    }
+
+    #[test]
+    fn records_to_tool_states_parses_json_input() {
+        let mut r = rec(1, "Read", false, Some(10));
+        r.tool_input = r#"{"file_path":"/tmp/x","replace_all":true}"#.to_string();
+        let states = records_to_tool_states(vec![r], 20);
+        assert_eq!(states[0].input["file_path"], "/tmp/x");
+        assert_eq!(states[0].input["replace_all"], true);
+    }
+
+    #[test]
+    fn records_to_tool_states_falls_back_to_null_on_bad_json() {
+        let mut r = rec(1, "Read", false, Some(10));
+        r.tool_input = "not valid json".to_string();
+        let states = records_to_tool_states(vec![r], 20);
+        assert!(states[0].input.is_null());
+    }
+
+    #[test]
+    fn records_to_tool_states_empty_input_yields_empty_output() {
+        let states = records_to_tool_states(Vec::new(), 20);
+        assert!(states.is_empty());
     }
 }
