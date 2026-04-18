@@ -6,7 +6,9 @@ use super::implement::ImplementHandler;
 use super::plan::PlanHandler;
 use super::research::ResearchHandler;
 use super::review::ReviewHandler;
-use super::types::{PhaseHandler, PhaseResult};
+use super::types::{check_agent_safety, PhaseError, PhaseHandler, PhaseResult};
+use crate::agent::AgentResult;
+use crate::providers::TokenUsage;
 use crate::pipeline::phases::{Phase, PhaseContext, Task};
 
 fn create_test_task() -> Task {
@@ -195,4 +197,94 @@ fn test_docs_instruction_generation() {
 
     assert!(instruction.contains("Docs Phase"));
     assert!(instruction.contains("CHANGELOG"));
+}
+
+// ── check_agent_safety helper ────────────────────────────────────────
+//
+// Agent safety flags (doom_loop_detected, budget_exhausted) previously
+// existed on `AgentResult` but were never inspected by phase handlers —
+// runaway-stopped agents were silently treated as successful. These
+// tests lock down the conversion from safety flag → PhaseError so a
+// future refactor can't regress the wiring.
+
+fn agent_result_ok() -> AgentResult {
+    AgentResult {
+        text: "ok".to_string(),
+        usage: TokenUsage::default(),
+        tool_calls: 1,
+        iterations: 1,
+        task_completed: true,
+        budget_exhausted: false,
+        doom_loop_detected: false,
+    }
+}
+
+#[test]
+fn check_agent_safety_passes_clean_result_through() {
+    let result = agent_result_ok();
+    let passed = check_agent_safety(result).expect("clean result must pass through");
+    assert!(passed.task_completed);
+    assert_eq!(passed.tool_calls, 1);
+}
+
+#[test]
+fn check_agent_safety_converts_doom_loop_to_error() {
+    let mut result = agent_result_ok();
+    result.doom_loop_detected = true;
+    result.iterations = 4;
+    result.tool_calls = 12;
+
+    let err = check_agent_safety(result).unwrap_err();
+    match err {
+        PhaseError::AgentSafetyStop { reason } => {
+            assert!(
+                reason.contains("doom loop"),
+                "reason must identify doom loop; got: {reason}"
+            );
+            assert!(
+                reason.contains("4") && reason.contains("12"),
+                "reason must include iterations/tool_calls for ops context; got: {reason}"
+            );
+        }
+        other => panic!("expected AgentSafetyStop, got {other:?}"),
+    }
+}
+
+#[test]
+fn check_agent_safety_converts_budget_exhausted_to_error() {
+    let mut result = agent_result_ok();
+    result.budget_exhausted = true;
+    result.iterations = 50;
+    result.tool_calls = 200;
+
+    let err = check_agent_safety(result).unwrap_err();
+    match err {
+        PhaseError::AgentSafetyStop { reason } => {
+            assert!(
+                reason.contains("budget"),
+                "reason must identify budget exhaustion; got: {reason}"
+            );
+        }
+        other => panic!("expected AgentSafetyStop, got {other:?}"),
+    }
+}
+
+#[test]
+fn check_agent_safety_prioritises_doom_loop_when_both_flags_set() {
+    // If both flags fire in the same run (rare but possible during long
+    // sessions) we surface the doom loop — it's the tighter, earlier
+    // signal and tells operators the agent was actively looping, not
+    // just slowly spending.
+    let mut result = agent_result_ok();
+    result.doom_loop_detected = true;
+    result.budget_exhausted = true;
+
+    let err = check_agent_safety(result).unwrap_err();
+    match err {
+        PhaseError::AgentSafetyStop { reason } => {
+            assert!(reason.contains("doom loop"));
+            assert!(!reason.contains("budget"));
+        }
+        other => panic!("expected AgentSafetyStop, got {other:?}"),
+    }
 }

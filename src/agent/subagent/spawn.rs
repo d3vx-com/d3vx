@@ -130,12 +130,23 @@ impl super::SubAgentManager {
             let result = agent_loop_for_spawn.run().await;
 
             let task_completed = result.as_ref().map(|r| r.task_completed).unwrap_or(false);
+            // A safety-stopped run is semantically a failure, even though
+            // it returns `Ok(_)` — without this check the subagent would
+            // be marked `Ended` and its orchestrator-observer would treat
+            // it as a clean, if unfinished, shutdown.
+            let safety_stop_reason = result
+                .as_ref()
+                .ok()
+                .and_then(|r| r.safety_stop_reason());
             let had_error = result.is_err();
 
             if let Some(agent) = agents_ref.write().await.get_mut(&loop_id) {
                 if had_error {
                     agent.status = SubAgentStatus::Failed;
                     agent.error = result.err().map(|e| e.to_string());
+                } else if let Some(reason) = safety_stop_reason {
+                    agent.status = SubAgentStatus::Failed;
+                    agent.error = Some(format!("Agent stopped for safety: {reason}"));
                 } else if task_completed {
                     agent.status = SubAgentStatus::Completed;
                 } else {

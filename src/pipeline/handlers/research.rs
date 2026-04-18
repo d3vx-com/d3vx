@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use super::types::{PhaseError, PhaseHandler, PhaseResult};
+use super::types::{check_agent_safety, PhaseError, PhaseHandler, PhaseResult};
 use crate::agent::AgentLoop;
 use crate::pipeline::phases::{Phase, PhaseContext, Task};
 use crate::pipeline::prompts;
@@ -71,7 +71,7 @@ impl PhaseHandler for ResearchHandler {
         agent.add_user_message(&instruction).await;
         agent.set_system_prompt(system_prompt).await;
 
-        let result = agent.run().await?;
+        let result = check_agent_safety(agent.run().await?)?;
 
         let metadata = serde_json::json!({
             "instruction": instruction,

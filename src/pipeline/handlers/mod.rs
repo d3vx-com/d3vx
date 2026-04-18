@@ -28,4 +28,4 @@ pub use implement::ImplementHandler;
 pub use plan::PlanHandler;
 pub use research::ResearchHandler;
 pub use review::ReviewHandler;
-pub use types::{PhaseError, PhaseHandler, PhaseResult};
+pub use types::{check_agent_safety, PhaseError, PhaseHandler, PhaseResult};

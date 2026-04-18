@@ -72,6 +72,7 @@ impl AgentLoop {
         let mut accumulated_text = String::new();
         let mut task_completed = false;
         let mut budget_exhausted = false;
+        let mut doom_loop_detected = false;
 
         // Cache config values to avoid repeated lock acquisition
         let (
@@ -231,7 +232,11 @@ impl AgentLoop {
             for (id, name, input) in &pending_tool_calls {
                 tracing::info!("Executing tool: {} ({})", name, id);
 
-                // Check for doom loop patterns
+                // Check for doom loop patterns. Record for every tool call so
+                // the detector sees the full pattern. If any call trips the
+                // threshold, flag the iteration — we still let the loop body
+                // finish scanning so users see warnings for every offender,
+                // but we skip tool execution and break the outer loop below.
                 if let Ok(mut detector) = self.doom_detector.lock() {
                     if let Some(warning) = detector.record(name, input) {
                         warn!(
@@ -244,8 +249,16 @@ impl AgentLoop {
                                 warning.tool, warning.repeats, warning.suggestion
                             ),
                         });
+                        doom_loop_detected = true;
                     }
                 }
+            }
+
+            // Honour the detector: don't execute a batch we know is looping.
+            // Stop cleanly with `doom_loop_detected` set so callers can
+            // distinguish runaway-stop from normal completion.
+            if doom_loop_detected {
+                break;
             }
 
             let tool_results = self
@@ -346,6 +359,7 @@ impl AgentLoop {
             iterations,
             task_completed,
             budget_exhausted,
+            doom_loop_detected,
         })
     }
 }

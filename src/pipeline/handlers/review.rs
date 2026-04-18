@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::{info, warn};
 
-use super::types::{PhaseError, PhaseHandler, PhaseResult};
+use super::types::{check_agent_safety, PhaseError, PhaseHandler, PhaseResult};
 use crate::agent::AgentLoop;
 use crate::pipeline::phases::{Phase, PhaseContext, Task};
 use crate::pipeline::prompts;
@@ -166,8 +166,17 @@ fn extract_markdown_findings(output: &str, task_id: &str) -> Vec<ReviewFinding> 
     for (pattern, severity) in &severity_patterns {
         if let Ok(re) = Regex::new(pattern) {
             for caps in re.captures_iter(output) {
-                let full_match = caps.get(0).unwrap().as_str();
-                let title = caps.get(1).unwrap().as_str().trim().to_string();
+                // Both matches are guaranteed by the current pattern
+                // shapes (all severity_patterns have one `(.+?)` group),
+                // but skipping on mismatch means a future pattern added
+                // without a group can't crash the review phase — it just
+                // produces no finding.
+                let Some(full) = caps.get(0) else { continue };
+                let Some(title_match) = caps.get(1) else {
+                    continue;
+                };
+                let full_match = full.as_str();
+                let title = title_match.as_str().trim().to_string();
 
                 let mut category = FindingCategory::Correctness;
                 for (cat_pattern, cat) in &category_patterns {
@@ -502,7 +511,7 @@ impl ReviewHandler {
             agent.add_user_message(instruction).await;
         }
 
-        let result = agent.run().await?;
+        let result = check_agent_safety(agent.run().await?)?;
         let output = result.text.clone();
 
         let findings = parse_findings(&output, task_id);

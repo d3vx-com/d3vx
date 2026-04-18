@@ -235,13 +235,22 @@ async fn run_session(
                 // Run agent synchronously (the events are processed in the background task)
                 match agent.run().await {
                     Ok(result) => {
-                        info!(
-                            iterations = result.iterations,
-                            tool_calls = result.tool_calls,
-                            input_tokens = result.usage.input_tokens,
-                            output_tokens = result.usage.output_tokens,
-                            "Agent turn completed"
-                        );
+                        if let Some(reason) = result.safety_stop_reason() {
+                            error!(reason = %reason, "Agent stopped for safety");
+                            let _ = event_tx
+                                .send(SessionEvent::Error(format!(
+                                    "Agent stopped for safety: {reason}"
+                                )))
+                                .await;
+                        } else {
+                            info!(
+                                iterations = result.iterations,
+                                tool_calls = result.tool_calls,
+                                input_tokens = result.usage.input_tokens,
+                                output_tokens = result.usage.output_tokens,
+                                "Agent turn completed"
+                            );
+                        }
                     }
                     Err(e) => {
                         error!(error = %e, "Agent error");

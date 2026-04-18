@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-use super::types::{PhaseError, PhaseHandler, PhaseResult};
+use super::types::{check_agent_safety, PhaseError, PhaseHandler, PhaseResult};
 use crate::agent::AgentLoop;
 use crate::pipeline::commander::ValidationRunner;
 use crate::pipeline::handlers::impl_spec::ImplementationSpec;
@@ -196,7 +196,7 @@ impl PhaseHandler for ImplementHandler {
             }
         }
 
-        let result = agent.run().await?;
+        let result = check_agent_safety(agent.run().await?)?;
 
         let validation_summary = self.run_validation(&context.worktree_path).await;
 

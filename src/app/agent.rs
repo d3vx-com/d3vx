@@ -430,11 +430,15 @@ impl App {
         tokio::spawn(async move {
             match agent.run().await {
                 Ok(result) => {
-                    info!(
-                        "Agent completed: {} chars, {} tool calls",
-                        result.text.len(),
-                        result.tool_calls
-                    );
+                    if let Some(reason) = result.safety_stop_reason() {
+                        error!("Agent stopped for safety: {reason}");
+                    } else {
+                        info!(
+                            "Agent completed: {} chars, {} tool calls",
+                            result.text.len(),
+                            result.tool_calls
+                        );
+                    }
                 }
                 Err(e) => {
                     error!("Agent run failed: {}", e);

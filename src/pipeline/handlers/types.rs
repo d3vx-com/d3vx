@@ -6,7 +6,7 @@ use std::fmt;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::agent::{AgentLoop, AgentLoopError};
+use crate::agent::{AgentLoop, AgentLoopError, AgentResult};
 use crate::pipeline::phases::{Phase, PhaseContext, Task};
 
 /// Errors that can occur during phase execution
@@ -47,9 +47,36 @@ pub enum PhaseError {
     #[error("No agent provided for phase execution")]
     NoAgent,
 
+    /// The agent voluntarily stopped because a safety guard tripped —
+    /// budget exhausted, doom loop detected, etc. Distinct from
+    /// `ExecutionFailed` so callers, metrics, and UI can distinguish
+    /// runaway-stops from genuine phase errors. Silently treating these
+    /// as success lets bad state bleed into later phases.
+    #[error("Agent stopped for safety: {reason}")]
+    AgentSafetyStop { reason: String },
+
     /// Generic error with message
     #[error("{0}")]
     Other(String),
+}
+
+/// Convert an [`AgentResult`] into `Err(PhaseError::AgentSafetyStop)` when
+/// the agent stopped because a safety guard tripped, otherwise pass the
+/// result through.
+///
+/// Phase handlers must call this on every `agent.run().await` result. Prior
+/// to wiring, handlers treated a doom-loop-stopped or budget-exhausted
+/// result as a normal success — advancing the task to the next phase with
+/// corrupt state.
+///
+/// Thin wrapper over [`AgentResult::safety_stop_reason`] — use that
+/// method directly from non-pipeline callers (subagent spawn, TUI
+/// session, conflict resolution) that need their own error type.
+pub fn check_agent_safety(result: AgentResult) -> Result<AgentResult, PhaseError> {
+    if let Some(reason) = result.safety_stop_reason() {
+        return Err(PhaseError::AgentSafetyStop { reason });
+    }
+    Ok(result)
 }
 
 impl From<std::io::Error> for PhaseError {

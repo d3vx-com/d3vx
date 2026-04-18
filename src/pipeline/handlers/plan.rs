@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use super::types::{PhaseError, PhaseHandler, PhaseResult};
+use super::types::{check_agent_safety, PhaseError, PhaseHandler, PhaseResult};
 use crate::agent::AgentLoop;
 use crate::pipeline::handlers::impl_spec::ImplementationSpec;
 use crate::pipeline::phases::{Phase, PhaseContext, Task};
@@ -71,7 +71,7 @@ impl PhaseHandler for PlanHandler {
         agent.clear_history().await;
         agent.add_user_message(&instruction).await;
 
-        let result = agent.run().await?;
+        let result = check_agent_safety(agent.run().await?)?;
 
         // After the plan agent finishes, load the plan JSON from disk
         // (the agent is instructed to write it there) into an ImplementationSpec.
