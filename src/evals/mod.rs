@@ -27,7 +27,9 @@
 
 pub mod environment;
 pub mod grader;
+pub mod metrics;
 pub mod result;
+pub mod runner;
 pub mod task;
 
 #[cfg(test)]
@@ -35,5 +37,7 @@ mod tests;
 
 pub use environment::{EvalEnvironment, EnvironmentError};
 pub use grader::{GradeOutcome, GraderSpec};
+pub use metrics::AgentMetrics;
 pub use result::{EvalReport, EvalResult, ReportFormat};
+pub use runner::{AgentDriver, DriverError, EvalRunner};
 pub use task::{EvalTask, TaskError, TaskLoadError};

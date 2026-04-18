@@ -6,4 +6,6 @@
 mod environment_tests;
 mod grader_tests;
 mod result_tests;
+mod runner_helpers;
+mod runner_tests;
 mod task_tests;
