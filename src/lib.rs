@@ -6,6 +6,7 @@ pub mod agent;
 pub mod app;
 pub mod cli;
 pub mod config;
+pub mod evals;
 pub mod event;
 pub mod hooks;
 pub mod ipc;
