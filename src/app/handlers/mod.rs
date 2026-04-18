@@ -4,10 +4,14 @@ pub mod agent;
 pub mod ipc;
 pub mod keyboard;
 
+#[cfg(test)]
+mod ipc_tests;
+
 use anyhow::Result;
 use crossterm::event::{MouseEvent, MouseEventKind};
 use tracing::error;
 
+use crate::app::state::DrawerHeight;
 use crate::app::{App, RightPaneTab};
 use crate::event::Event;
 
@@ -96,6 +100,17 @@ impl App {
     pub fn handle_mouse_event(&mut self, mouse: MouseEvent) -> Result<()> {
         match mouse.kind {
             MouseEventKind::ScrollUp => {
+                // Check drawer scroll first
+                if let Some(drawer_rect) = self.layout.last_drawer_rect {
+                    if mouse.column >= drawer_rect.x
+                        && mouse.column < drawer_rect.x + drawer_rect.width
+                        && mouse.row >= drawer_rect.y
+                        && mouse.row < drawer_rect.y + drawer_rect.height
+                    {
+                        self.ui.drawer_scroll = self.ui.drawer_scroll.saturating_sub(3);
+                        return Ok(());
+                    }
+                }
                 if let Some(detail_rect) = self.layout.last_agent_detail_rect {
                     if mouse.column >= detail_rect.x
                         && mouse.column < detail_rect.x + detail_rect.width
@@ -135,6 +150,21 @@ impl App {
                     .min(self.ui.max_scroll.get());
             }
             MouseEventKind::ScrollDown => {
+                // Check drawer scroll first
+                if let Some(drawer_rect) = self.layout.last_drawer_rect {
+                    if mouse.column >= drawer_rect.x
+                        && mouse.column < drawer_rect.x + drawer_rect.width
+                        && mouse.row >= drawer_rect.y
+                        && mouse.row < drawer_rect.y + drawer_rect.height
+                    {
+                        let max_scroll = self
+                            .ui
+                            .drawer_content_lines
+                            .saturating_sub(drawer_rect.height.saturating_sub(2) as usize);
+                        self.ui.drawer_scroll = (self.ui.drawer_scroll + 3).min(max_scroll);
+                        return Ok(());
+                    }
+                }
                 if let Some(detail_rect) = self.layout.last_agent_detail_rect {
                     if mouse.column >= detail_rect.x
                         && mouse.column < detail_rect.x + detail_rect.width
@@ -169,6 +199,40 @@ impl App {
             MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
                 let x = mouse.column;
                 let y = mouse.row;
+
+                // Check Agent Strip click — pill or empty area
+                if let Some(strip_rect) = self.layout.last_strip_rect {
+                    if x >= strip_rect.x
+                        && x < strip_rect.x + strip_rect.width
+                        && y >= strip_rect.y
+                        && y < strip_rect.y + strip_rect.height
+                    {
+                        // Check if clicked on a specific pill
+                        let mut clicked_pill = None;
+                        for &(start_col, end_col, agent_idx) in &self.layout.strip_pill_positions {
+                            if x >= start_col && x < end_col {
+                                clicked_pill = Some(agent_idx);
+                                break;
+                            }
+                        }
+
+                        if let Some(agent_idx) = clicked_pill {
+                            // Select this agent and open drawer
+                            if agent_idx < self.agents.inline_agents.len() {
+                                self.agents.selected_inline_agent = Some(agent_idx);
+                                self.ui.drawer_agent_id =
+                                    Some(self.agents.inline_agents[agent_idx].id.clone());
+                                self.save_scroll_anchor();
+                                self.ui.drawer_height = DrawerHeight::Percent30;
+                                self.ui.drawer_scroll = 0;
+                            }
+                        } else {
+                            // Clicked empty strip area — toggle expanded
+                            self.ui.strip_expanded = !self.ui.strip_expanded;
+                        }
+                        return Ok(());
+                    }
+                }
 
                 // Check Activity Panel click
                 if let Some(ref activity_rect) = self.layout.last_activity_rect {
