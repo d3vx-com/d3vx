@@ -30,16 +30,20 @@
 //! | [`board`]   | Task board (add/claim/complete/list)                  |
 //! | [`inbox`]   | Per-agent inbox + shared broadcast                    |
 
+pub mod agent_tools;
 pub mod board;
 pub mod errors;
 pub mod inbox;
 pub mod io;
+pub mod prompt;
 pub mod task;
 
 #[cfg(test)]
 mod tests;
 
+pub use agent_tools::CoordinationToolset;
 pub use board::CoordinationBoard;
 pub use errors::CoordinationError;
 pub use inbox::{BroadcastLog, Inbox, Message};
+pub use prompt::coordination_preamble;
 pub use task::{BoardTask, NewTask, TaskStatus};
