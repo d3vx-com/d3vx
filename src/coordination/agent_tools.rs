@@ -1,74 +1,86 @@
 //! Tool bindings that expose the coordination layer to an agent.
 //!
-//! Five tools, each a thin wrapper over a board or inbox operation:
+//! This file owns the **factory** surface — `CoordinationToolset` and
+//! its `register_on` convenience. The actual `Tool` implementations
+//! live in [`tool_impls`](super::tool_impls) so this file stays under
+//! the 300-line guideline.
 //!
-//! | Tool                    | Backed by                               |
-//! |-------------------------|-----------------------------------------|
-//! | `coord_list_ready_tasks`| `CoordinationBoard::list_ready_tasks`   |
-//! | `coord_claim_task`      | `CoordinationBoard::claim_task`         |
-//! | `coord_complete_task`   | `CoordinationBoard::complete_task`      |
-//! | `coord_send_message`    | `Inbox::send` (recipient's inbox)       |
-//! | `coord_drain_inbox`     | `Inbox::drain` (this agent's inbox)     |
+//! # Tools
 //!
-//! The toolset is built from a coordination root + agent id; the root
-//! layout is `{root}/tasks/` for the board and `{root}/inboxes/` for
-//! per-agent inboxes. Callers that want richer coordination (broadcast
-//! announcements, task creation) call the underlying
-//! [`CoordinationBoard`](super::CoordinationBoard) and
-//! [`BroadcastLog`](super::BroadcastLog) directly — those aren't
-//! exposed as tools yet because the common worker flow doesn't need
-//! them.
+//! | Tool                     | Backed by                              |
+//! |--------------------------|----------------------------------------|
+//! | `coord_list_ready_tasks` | `CoordinationBoard::list_ready_tasks`  |
+//! | `coord_claim_task`       | `CoordinationBoard::claim_task`        |
+//! | `coord_complete_task`    | `CoordinationBoard::complete_task`     |
+//! | `coord_send_message`     | `Inbox::send` (recipient's inbox)      |
+//! | `coord_drain_inbox`      | `Inbox::drain` (this agent's inbox)    |
+//!
+//! # Per-agent context via `ToolContext`
+//!
+//! Tools are registered **once** on a shared
+//! [`ToolCoordinator`](crate::agent::ToolCoordinator). Every agent that
+//! executes a tool provides its own
+//! [`ToolContext`](crate::tools::ToolContext); the calling agent's id
+//! is pulled from `ctx.session_id` at call time, so one registered set
+//! serves every agent — no name collisions, no per-agent tool
+//! lifetimes.
+//!
+//! # Root layout
+//!
+//! ```text
+//! {coord_root}/
+//!   ├── tasks/                 ← CoordinationBoard data
+//!   └── inboxes/
+//!       ├── {agent_id}.jsonl   ← Inbox::open resolves this
+//!       └── ...
+//! ```
+//!
+//! Callers that want richer coordination (broadcast announcements, task
+//! creation) reach into [`CoordinationBoard`](super::CoordinationBoard)
+//! and [`BroadcastLog`](super::BroadcastLog) directly.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use serde_json::json;
-
 use super::board::CoordinationBoard;
 use super::errors::CoordinationError;
-use super::inbox::{Inbox, Message};
-use crate::tools::{Tool, ToolContext, ToolDefinition, ToolResult};
+use super::prompt::coordination_preamble;
+use super::tool_impls::{
+    ClaimTaskTool, CompleteTaskTool, DrainInboxTool, ListReadyTasksTool, SendMessageTool,
+};
+use crate::agent::{AgentConfig, ToolCoordinator};
+use crate::tools::{Tool, ToolContext, ToolResult};
 
-/// Bundle of coordination tools for one agent, pointed at one root.
+/// Bundle of coordination tools rooted at one coordination directory.
 ///
-/// Cheap to clone: internal state is `Arc`-shared, so the returned
-/// tools can be distributed across async tasks freely.
+/// Cheap to clone — internal state is `Arc`-shared. Agent id is
+/// resolved from [`ToolContext::session_id`] at tool-call time, so one
+/// toolset serves every agent using the same coordination root.
 #[derive(Clone)]
 pub struct CoordinationToolset {
     board: Arc<CoordinationBoard>,
-    inbox: Arc<Inbox>,
     inboxes_dir: PathBuf,
-    agent_id: String,
 }
 
 impl CoordinationToolset {
-    /// Build a toolset rooted at `coord_root`. Creates the board
-    /// (`tasks/`) and inbox directory (`inboxes/`) if they don't exist
-    /// already.
-    pub fn new(
-        coord_root: impl AsRef<Path>,
-        agent_id: impl Into<String>,
-    ) -> Result<Self, CoordinationError> {
+    /// Build a toolset rooted at `coord_root`. Creates `tasks/` and
+    /// `inboxes/` under the root if they don't already exist.
+    pub fn new(coord_root: impl AsRef<Path>) -> Result<Self, CoordinationError> {
         let root = coord_root.as_ref();
         let board = Arc::new(CoordinationBoard::open(root.join("tasks"))?);
         let inboxes_dir = root.join("inboxes");
-        let agent_id = agent_id.into();
-        let inbox = Arc::new(Inbox::open(&inboxes_dir, &agent_id)?);
-        Ok(Self {
-            board,
-            inbox,
-            inboxes_dir,
-            agent_id,
-        })
+        std::fs::create_dir_all(&inboxes_dir).map_err(|source| {
+            CoordinationError::Io {
+                path: inboxes_dir.clone(),
+                source,
+            }
+        })?;
+        Ok(Self { board, inboxes_dir })
     }
 
-    pub fn agent_id(&self) -> &str {
-        &self.agent_id
-    }
-
-    /// Produce the tool instances. Registers each on the tool
-    /// coordinator is the caller's responsibility.
+    /// Produce the tool instances as `Arc<dyn Tool>`. Useful for
+    /// enumeration or custom registration paths; ordinary callers
+    /// should prefer [`register_on`](Self::register_on).
     pub fn tools(&self) -> Vec<Arc<dyn Tool>> {
         vec![
             Arc::new(ListReadyTasksTool {
@@ -76,193 +88,83 @@ impl CoordinationToolset {
             }),
             Arc::new(ClaimTaskTool {
                 board: self.board.clone(),
-                agent_id: self.agent_id.clone(),
             }),
             Arc::new(CompleteTaskTool {
                 board: self.board.clone(),
             }),
             Arc::new(SendMessageTool {
                 inboxes_dir: self.inboxes_dir.clone(),
-                from: self.agent_id.clone(),
             }),
             Arc::new(DrainInboxTool {
-                inbox: self.inbox.clone(),
+                inboxes_dir: self.inboxes_dir.clone(),
             }),
         ]
     }
-}
 
-// ── tool impls ────────────────────────────────────────────────────
-
-struct ListReadyTasksTool {
-    board: Arc<CoordinationBoard>,
-}
-
-#[async_trait]
-impl Tool for ListReadyTasksTool {
-    fn definition(&self) -> ToolDefinition {
-        ToolDefinition {
-            name: "coord_list_ready_tasks".to_string(),
-            description: "List tasks on the coordination board whose \
-                dependencies are satisfied and which have no current \
-                owner. Use before starting new work to avoid \
-                duplicating another agent's effort.".to_string(),
-            input_schema: json!({ "type": "object", "properties": {} }),
+    /// One-liner spawn-time integration: register every coordination
+    /// tool on `coordinator` **and** prepend the coordination preamble
+    /// to `config.system_prompt` so the agent knows the tools exist.
+    ///
+    /// An empty existing system prompt is replaced outright; a
+    /// non-empty one has the preamble inserted ahead of it with a
+    /// blank-line separator. This keeps any task-specific persona the
+    /// caller has already configured.
+    pub async fn attach_to_agent(
+        &self,
+        coordinator: &ToolCoordinator,
+        config: &mut AgentConfig,
+    ) {
+        self.register_on(coordinator).await;
+        let preamble = coordination_preamble();
+        if config.system_prompt.is_empty() {
+            config.system_prompt = preamble;
+        } else {
+            config.system_prompt = format!("{preamble}\n{}", config.system_prompt);
         }
     }
 
-    async fn execute(&self, _input: serde_json::Value, _ctx: &ToolContext) -> ToolResult {
-        match self.board.list_ready_tasks() {
-            Ok(tasks) => ToolResult::success(
-                serde_json::to_string_pretty(&tasks).unwrap_or_else(|_| "[]".into()),
-            ),
-            Err(e) => ToolResult::error(e.to_string()),
-        }
+    /// Register every coordination tool on `coordinator`. Call once at
+    /// startup (or at spawn time) after building the toolset — tools
+    /// are agent-agnostic, so one registration covers every agent that
+    /// will use the same coordinator.
+    pub async fn register_on(&self, coordinator: &ToolCoordinator) {
+        coordinator
+            .register_tool(ListReadyTasksTool {
+                board: self.board.clone(),
+            })
+            .await;
+        coordinator
+            .register_tool(ClaimTaskTool {
+                board: self.board.clone(),
+            })
+            .await;
+        coordinator
+            .register_tool(CompleteTaskTool {
+                board: self.board.clone(),
+            })
+            .await;
+        coordinator
+            .register_tool(SendMessageTool {
+                inboxes_dir: self.inboxes_dir.clone(),
+            })
+            .await;
+        coordinator
+            .register_tool(DrainInboxTool {
+                inboxes_dir: self.inboxes_dir.clone(),
+            })
+            .await;
     }
 }
 
-struct ClaimTaskTool {
-    board: Arc<CoordinationBoard>,
-    agent_id: String,
-}
-
-#[async_trait]
-impl Tool for ClaimTaskTool {
-    fn definition(&self) -> ToolDefinition {
-        ToolDefinition {
-            name: "coord_claim_task".to_string(),
-            description: "Atomically claim a ready task for this agent. \
-                Fails if the task is already claimed, not in \
-                Pending state, or has unresolved dependencies."
-                .to_string(),
-            input_schema: json!({
-                "type": "object",
-                "properties": {
-                    "task_id": { "type": "string", "description": "Task id to claim." }
-                },
-                "required": ["task_id"]
-            }),
-        }
-    }
-
-    async fn execute(&self, input: serde_json::Value, _ctx: &ToolContext) -> ToolResult {
-        let Some(task_id) = input.get("task_id").and_then(|v| v.as_str()) else {
-            return ToolResult::error("missing `task_id`");
-        };
-        match self.board.claim_task(task_id, &self.agent_id) {
-            Ok(t) => ToolResult::success(
-                serde_json::to_string_pretty(&t).unwrap_or_default(),
-            ),
-            Err(e) => ToolResult::error(e.to_string()),
-        }
-    }
-}
-
-struct CompleteTaskTool {
-    board: Arc<CoordinationBoard>,
-}
-
-#[async_trait]
-impl Tool for CompleteTaskTool {
-    fn definition(&self) -> ToolDefinition {
-        ToolDefinition {
-            name: "coord_complete_task".to_string(),
-            description: "Mark a task as completed with a short result \
-                summary. Only the current owner should call this."
-                .to_string(),
-            input_schema: json!({
-                "type": "object",
-                "properties": {
-                    "task_id": { "type": "string" },
-                    "result":  { "type": "string", "description": "Short summary of what was done." }
-                },
-                "required": ["task_id", "result"]
-            }),
-        }
-    }
-
-    async fn execute(&self, input: serde_json::Value, _ctx: &ToolContext) -> ToolResult {
-        let Some(task_id) = input.get("task_id").and_then(|v| v.as_str()) else {
-            return ToolResult::error("missing `task_id`");
-        };
-        let Some(result) = input.get("result").and_then(|v| v.as_str()) else {
-            return ToolResult::error("missing `result`");
-        };
-        match self.board.complete_task(task_id, result) {
-            Ok(t) => ToolResult::success(
-                serde_json::to_string_pretty(&t).unwrap_or_default(),
-            ),
-            Err(e) => ToolResult::error(e.to_string()),
-        }
-    }
-}
-
-struct SendMessageTool {
-    inboxes_dir: PathBuf,
-    from: String,
-}
-
-#[async_trait]
-impl Tool for SendMessageTool {
-    fn definition(&self) -> ToolDefinition {
-        ToolDefinition {
-            name: "coord_send_message".to_string(),
-            description: "Send a point-to-point message to another \
-                agent's inbox. The recipient reads via \
-                coord_drain_inbox.".to_string(),
-            input_schema: json!({
-                "type": "object",
-                "properties": {
-                    "to":   { "type": "string", "description": "Recipient agent id." },
-                    "body": { "type": "string", "description": "Message body." }
-                },
-                "required": ["to", "body"]
-            }),
-        }
-    }
-
-    async fn execute(&self, input: serde_json::Value, _ctx: &ToolContext) -> ToolResult {
-        let Some(to) = input.get("to").and_then(|v| v.as_str()) else {
-            return ToolResult::error("missing `to`");
-        };
-        let Some(body) = input.get("body").and_then(|v| v.as_str()) else {
-            return ToolResult::error("missing `body`");
-        };
-        let inbox = match Inbox::open(&self.inboxes_dir, to) {
-            Ok(i) => i,
-            Err(e) => return ToolResult::error(e.to_string()),
-        };
-        let msg = Message::new(&self.from, to, body);
-        match inbox.send(&msg) {
-            Ok(()) => ToolResult::success(format!("sent to {to}")),
-            Err(e) => ToolResult::error(e.to_string()),
-        }
-    }
-}
-
-struct DrainInboxTool {
-    inbox: Arc<Inbox>,
-}
-
-#[async_trait]
-impl Tool for DrainInboxTool {
-    fn definition(&self) -> ToolDefinition {
-        ToolDefinition {
-            name: "coord_drain_inbox".to_string(),
-            description: "Read and clear every message addressed to this \
-                agent. Returns a JSON array of messages (from, body, \
-                sent_at). Call at the start of each iteration."
-                .to_string(),
-            input_schema: json!({ "type": "object", "properties": {} }),
-        }
-    }
-
-    async fn execute(&self, _input: serde_json::Value, _ctx: &ToolContext) -> ToolResult {
-        match self.inbox.drain() {
-            Ok(messages) => ToolResult::success(
-                serde_json::to_string_pretty(&messages).unwrap_or_else(|_| "[]".into()),
-            ),
-            Err(e) => ToolResult::error(e.to_string()),
-        }
-    }
+/// Pull the calling agent's id from the tool context, or produce a
+/// clear error result if it's absent.
+///
+/// `pub(super)` so sibling `tool_impls` can call it but nothing outside
+/// the coordination module sees it.
+pub(super) fn require_agent_id(ctx: &ToolContext) -> Result<&str, ToolResult> {
+    ctx.session_id.as_deref().ok_or_else(|| {
+        ToolResult::error(
+            "ToolContext has no session_id; coordination tools require one",
+        )
+    })
 }

@@ -25,6 +25,7 @@
 //! drive an agent. This keeps the grading layer testable in isolation and
 //! lets the eval harness live without coupling to any specific runtime.
 
+pub mod agent_loop_driver;
 pub mod environment;
 pub mod grader;
 pub mod metrics;
@@ -35,6 +36,7 @@ pub mod task;
 #[cfg(test)]
 mod tests;
 
+pub use agent_loop_driver::AgentLoopDriver;
 pub use environment::{EvalEnvironment, EnvironmentError};
 pub use grader::{GradeOutcome, GraderSpec};
 pub use metrics::AgentMetrics;

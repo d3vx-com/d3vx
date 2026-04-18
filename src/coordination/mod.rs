@@ -37,6 +37,7 @@ pub mod inbox;
 pub mod io;
 pub mod prompt;
 pub mod task;
+mod tool_impls;
 
 #[cfg(test)]
 mod tests;
