@@ -12,6 +12,23 @@ fn test_phase_ordering() {
 }
 
 #[test]
+fn test_phase_all_matches_next_chain() {
+    // `Phase::all()` and `Phase::next()` must agree on execution order.
+    // If someone reorders the enum or edits one without the other, this fails.
+    let phases = Phase::all();
+    for window in phases.windows(2) {
+        assert_eq!(
+            window[0].next(),
+            Some(window[1]),
+            "Phase::all() order drifted from Phase::next() chain at {:?} -> {:?}",
+            window[0],
+            window[1],
+        );
+    }
+    assert_eq!(phases.last().copied().and_then(|p| p.next()), None);
+}
+
+#[test]
 fn test_phase_next() {
     assert_eq!(Phase::Research.next(), Some(Phase::Ideation));
     assert_eq!(Phase::Ideation.next(), Some(Phase::Plan));
@@ -334,4 +351,34 @@ fn test_task_retry_boundary() {
         assert_eq!(task.retry_count, i);
     }
     assert!(!task.can_retry());
+}
+
+#[test]
+fn test_with_internal_source_on_null_metadata() {
+    let task = Task::new("T-1", "T", "I").with_internal_source("decomposition");
+    let map = task.metadata.as_object().expect("metadata should be object");
+    assert_eq!(
+        map.get("source"),
+        Some(&serde_json::Value::String("decomposition".to_string()))
+    );
+}
+
+#[test]
+fn test_with_internal_source_preserves_existing_metadata() {
+    let mut task = Task::new("T-1", "T", "I");
+    task.metadata = serde_json::json!({ "existing": "keep-me" });
+    let task = task.with_internal_source("reaction");
+
+    let map = task.metadata.as_object().unwrap();
+    assert_eq!(map.get("existing").and_then(|v| v.as_str()), Some("keep-me"));
+    assert_eq!(map.get("source").and_then(|v| v.as_str()), Some("reaction"));
+}
+
+#[test]
+fn test_with_internal_source_overwrites_existing_source() {
+    let task = Task::new("T-1", "T", "I")
+        .with_internal_source("first")
+        .with_internal_source("second");
+    let map = task.metadata.as_object().unwrap();
+    assert_eq!(map.get("source").and_then(|v| v.as_str()), Some("second"));
 }

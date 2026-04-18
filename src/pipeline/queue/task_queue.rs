@@ -12,14 +12,18 @@ use crate::pipeline::phases::{Priority, Task, TaskStatus};
 ///
 /// # Usage
 ///
-/// This queue should only be accessed through the `PipelineOrchestrator`.
-/// Direct manipulation bypasses important system invariants.
+/// This queue is an internal component of the pipeline. Task creation must go
+/// through [`PipelineOrchestrator`](super::super::orchestrator::PipelineOrchestrator)
+/// (or its [`TaskAuthority`](super::super::orchestrator::TaskAuthority) trait),
+/// which guarantees that tasks are classified, routed, and tracked before enqueueing.
+///
+/// [`add_task`](Self::add_task) is `pub(in crate::pipeline)`: crate-external callers
+/// cannot bypass the orchestrator. The runtime metadata check on
+/// [`with_orchestrator_enforcement`] queues remains as defense-in-depth against
+/// accidental intra-pipeline misuse.
 ///
 /// ```ignore
-/// // DON'T do this:
-/// queue.add_task(task).await?;
-///
-/// // DO this instead:
+/// // DO this:
 /// orchestrator.create_task_from_chat(title, instruction, priority).await?;
 /// ```
 pub struct TaskQueue {
@@ -91,8 +95,13 @@ impl TaskQueue {
         *cb = Some(callback);
     }
 
-    /// Add a task to the queue
-    pub async fn add_task(&self, task: Task) -> Result<(), QueueError> {
+    /// Add a task to the queue.
+    ///
+    /// Restricted to the `pipeline` module tree so only the orchestrator
+    /// (and pipeline-internal helpers like `TaskFactory` and the decomposition
+    /// executor) can enqueue tasks. External callers must go through
+    /// [`PipelineOrchestrator`](super::super::orchestrator::PipelineOrchestrator).
+    pub(in crate::pipeline) async fn add_task(&self, task: Task) -> Result<(), QueueError> {
         let task_id = task.id.clone();
         let priority = task.priority;
         let status = task.status;

@@ -9,6 +9,14 @@ use std::fmt;
 pub use super::super::classifier::ExecutionMode;
 
 /// Pipeline phases representing the stages of task execution.
+///
+/// Declaration order matches the execution order enforced by [`Phase::next`]
+/// and [`Phase::all`]: `Research → Ideation → Plan → Draft → Review → Implement → Docs`.
+///
+/// Note the unusual ordering: `Review` runs **before** `Implement`. The `Draft`
+/// phase produces unified diffs; `Review` inspects those diffs; `Implement` then
+/// applies the approved diffs. This is intentional — it enables gate-before-apply
+/// semantics rather than the more common write-then-review pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Phase {
@@ -20,10 +28,10 @@ pub enum Phase {
     Plan,
     /// Draft phase: Generates implementation drafts (unified diffs)
     Draft,
-    /// Implement phase: Executes the implementation (applies diffs)
-    Implement,
-    /// Review phase: Reviews changes, runs tests
+    /// Review phase: Reviews drafted diffs, runs tests before apply
     Review,
+    /// Implement phase: Applies reviewed diffs to the working tree
+    Implement,
     /// Docs phase: Generates documentation
     Docs,
 }

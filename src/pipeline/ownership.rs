@@ -346,7 +346,25 @@ impl OwnershipManager {
         };
 
         let mut tasks = self.tasks.write().await;
-        let state = tasks.get_mut(task_id).unwrap();
+        // `get_or_create` above guaranteed this entry existed under the
+        // write lock, but we released that lock to build `token`/`event`.
+        // Today nothing removes tasks, but under `panic = abort` a stray
+        // future cleanup path would crash the whole process here — so
+        // surface the invariant violation as a failure instead.
+        let state = match tasks.get_mut(task_id) {
+            Some(s) => s,
+            None => {
+                return OwnershipResult {
+                    success: false,
+                    state: OwnershipState::new(task_id.to_string()),
+                    token: None,
+                    error: Some(format!(
+                        "Ownership entry for task {} was removed while acquiring",
+                        task_id
+                    )),
+                };
+            }
+        };
 
         state.generation = new_generation;
         state.current_owner = Some(owner);
