@@ -13,6 +13,7 @@ use super::super::phases::{Phase, PhaseContext, Task, TaskStatus};
 use super::super::resume::ResumeManager;
 use super::super::resume::SessionSnapshot;
 use super::super::snapshot_policy::{SnapshotConfig, SnapshotPolicy, SnapshotTrigger};
+use super::super::timeout::{TimeoutConfig, TimeoutManager};
 use super::config::{PhaseCallback, PipelineConfig, StatusCallback};
 use crate::agent::AgentLoop;
 
@@ -57,6 +58,12 @@ pub struct PipelineEngine {
     handlers: RwLock<HashMap<Phase, Arc<dyn PhaseHandler>>>,
     /// Engine configuration
     config: PipelineConfig,
+    /// Per-phase timeouts applied around each `handler.execute()` call.
+    /// Previously timeouts were wrapped at orchestrator level around the
+    /// whole multi-phase `run_with_agent`, using the *initial* phase's
+    /// budget — which silently capped every task by its first phase's
+    /// timeout. Per-phase wrapping here is the correct place.
+    timeout_config: TimeoutConfig,
     /// Callbacks for phase completion events
     phase_callbacks: RwLock<Vec<PhaseCallback>>,
     /// Callbacks for status change events
@@ -83,6 +90,7 @@ impl PipelineEngine {
         let mut engine = Self {
             handlers: RwLock::new(HashMap::new()),
             config: PipelineConfig::default(),
+            timeout_config: TimeoutConfig::default(),
             phase_callbacks: RwLock::new(Vec::new()),
             status_callbacks: RwLock::new(Vec::new()),
             agent: None,
@@ -99,6 +107,17 @@ impl PipelineEngine {
         }
 
         engine
+    }
+
+    /// Builder: set the per-phase timeout configuration.
+    ///
+    /// Each phase handler call will be bounded by
+    /// [`TimeoutConfig::get_timeout`](super::super::timeout::TimeoutConfig::get_timeout)
+    /// for that phase. Timeouts fail the task without retry — a hung handler
+    /// is almost certainly in a bad state and retrying burns budget.
+    pub fn with_timeout_config(mut self, config: TimeoutConfig) -> Self {
+        self.timeout_config = config;
+        self
     }
 
     /// Create a new pipeline engine with custom configuration
@@ -233,9 +252,25 @@ impl PipelineEngine {
                 }
             };
 
-            // Execute the phase with agent if available
-            let result = match handler.execute(&task, &context, self.agent.clone()).await {
+            // Execute the phase with agent if available, bounded by the
+            // per-phase timeout. Hung handlers fail the task immediately —
+            // retries only apply to genuine errors, not timeouts.
+            let mut timeout_mgr = TimeoutManager::with_config(self.timeout_config.clone());
+            let execute_future = handler.execute(&task, &context, self.agent.clone());
+            let result = match timeout_mgr
+                .execute_with_timeout(current_phase, execute_future)
+                .await
+            {
                 Ok(r) => r,
+                Err(PhaseError::Timeout { timeout_ms }) => {
+                    error!(
+                        "Phase {} timed out after {}ms; failing task (no retry on timeout)",
+                        current_phase, timeout_ms
+                    );
+                    task.set_status(TaskStatus::Failed);
+                    self.notify_status_change(&task).await;
+                    return Err(PhaseError::Timeout { timeout_ms });
+                }
                 Err(e) => {
                     error!("Phase {} failed: {}", current_phase, e);
 
@@ -364,7 +399,11 @@ impl PipelineEngine {
                 }
             };
 
-            let result = handler.execute(&task, &context, self.agent.clone()).await?;
+            let mut timeout_mgr = TimeoutManager::with_config(self.timeout_config.clone());
+            let execute_future = handler.execute(&task, &context, self.agent.clone());
+            let result = timeout_mgr
+                .execute_with_timeout(*phase, execute_future)
+                .await?;
             phase_results.insert(*phase, result.clone());
 
             self.notify_phase_complete(&task, *phase, &result).await;
@@ -433,9 +472,25 @@ impl PipelineEngine {
                 }
             };
 
-            // Execute the phase with the provided agent
-            let result = match handler.execute(&task, &context, Some(agent.clone())).await {
+            // Execute the phase with the provided agent, bounded by the
+            // per-phase timeout. See `run()` above for the same rationale:
+            // timeouts bypass the retry path.
+            let mut timeout_mgr = TimeoutManager::with_config(self.timeout_config.clone());
+            let execute_future = handler.execute(&task, &context, Some(agent.clone()));
+            let result = match timeout_mgr
+                .execute_with_timeout(current_phase, execute_future)
+                .await
+            {
                 Ok(r) => r,
+                Err(PhaseError::Timeout { timeout_ms }) => {
+                    error!(
+                        "Phase {} timed out after {}ms; failing task (no retry on timeout)",
+                        current_phase, timeout_ms
+                    );
+                    task.set_status(TaskStatus::Failed);
+                    self.notify_status_change(&task).await;
+                    return Err(PhaseError::Timeout { timeout_ms });
+                }
                 Err(e) => {
                     error!("Phase {} failed: {}", current_phase, e);
 
