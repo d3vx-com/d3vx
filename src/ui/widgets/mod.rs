@@ -8,6 +8,8 @@ pub mod help_modal;
 pub mod inline_agents;
 pub mod input;
 pub mod markdown;
+mod markdown_renderer;
+mod markdown_table;
 pub mod message_list;
 pub mod model_picker;
 pub mod session_picker;
