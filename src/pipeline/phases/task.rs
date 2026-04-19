@@ -129,6 +129,27 @@ impl Task {
         self
     }
 
+    /// Stamp the `source` metadata key for tasks created inside the pipeline.
+    ///
+    /// Tasks that bypass [`TaskIntake`](super::super::intake::TaskIntake) (e.g.
+    /// decomposition children, reaction-triggered tasks) still need orchestrator
+    /// provenance metadata to pass
+    /// [`TaskQueue::with_orchestrator_enforcement`](super::super::queue::TaskQueue)
+    /// admission. The canonical intake path sets a serialized
+    /// [`TaskSource`](super::super::intake::TaskSource) under the same key;
+    /// internal callers use this helper with a string label instead.
+    pub fn with_internal_source(mut self, label: impl Into<String>) -> Self {
+        let label = label.into();
+        let mut map = match self.metadata {
+            serde_json::Value::Object(map) => map,
+            _ => serde_json::Map::new(),
+        };
+        map.insert("source".to_string(), serde_json::Value::String(label));
+        self.metadata = serde_json::Value::Object(map);
+        self.updated_at = Utc::now();
+        self
+    }
+
     /// Update the phase and touch the updated_at timestamp
     pub fn set_phase(&mut self, phase: Phase) {
         self.phase = phase;

@@ -3,7 +3,7 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::state::RightPaneTab;
+use crate::app::state::{DrawerHeight, RightPaneTab};
 use crate::app::{App, AppMode};
 
 impl App {
@@ -222,6 +222,54 @@ impl App {
             // Pop from queue
             (KeyCode::Char('x'), KeyModifiers::CONTROL) => {
                 self.session.message_queue.pop();
+            }
+
+            // Cycle detail drawer height (Ctrl+W)
+            (KeyCode::Char('w'), KeyModifiers::CONTROL) => {
+                if self.agents.inline_agents.is_empty() {
+                    return Ok(());
+                }
+                self.save_scroll_anchor();
+                self.ui.drawer_height = self.ui.drawer_height.cycle();
+                // Auto-select first agent when opening drawer with none selected
+                if self.ui.drawer_height != DrawerHeight::Closed
+                    && self.agents.selected_inline_agent.is_none()
+                {
+                    self.agents.selected_inline_agent = Some(0);
+                }
+            }
+
+            // Toggle agent strip expanded/collapsed (Ctrl+S)
+            (KeyCode::Char('s'), KeyModifiers::CONTROL) => {
+                if !self.agents.inline_agents.is_empty() {
+                    self.ui.strip_expanded = !self.ui.strip_expanded;
+                }
+            }
+
+            // PageUp / PageDown — scroll drawer when visible, else normal chat scroll
+            (KeyCode::PageUp, KeyModifiers::NONE) => {
+                if self.ui.drawer_height != DrawerHeight::Closed {
+                    self.ui.drawer_scroll = self.ui.drawer_scroll.saturating_sub(5);
+                } else {
+                    self.ui.scroll_offset = self
+                        .ui
+                        .scroll_offset
+                        .saturating_add(5)
+                        .min(self.ui.max_scroll.get());
+                }
+            }
+            (KeyCode::PageDown, KeyModifiers::NONE) => {
+                if self.ui.drawer_height != DrawerHeight::Closed {
+                    let max = self.ui.drawer_content_lines.saturating_sub(
+                        self.layout
+                            .last_drawer_rect
+                            .map(|r| r.height.saturating_sub(2) as usize)
+                            .unwrap_or(0),
+                    );
+                    self.ui.drawer_scroll = (self.ui.drawer_scroll + 5).min(max);
+                } else {
+                    self.ui.scroll_offset = self.ui.scroll_offset.saturating_sub(5);
+                }
             }
 
             // Delegate remaining keys to navigation handler

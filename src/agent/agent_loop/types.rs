@@ -19,6 +19,38 @@ pub struct AgentResult {
     pub task_completed: bool,
     /// Whether the agent stopped due to budget exhaustion.
     pub budget_exhausted: bool,
+    /// Whether the agent stopped due to a detected doom-loop pattern
+    /// (the same tool+input repeated past the detector's threshold).
+    pub doom_loop_detected: bool,
+}
+
+impl AgentResult {
+    /// Return a human-readable reason if the agent voluntarily stopped
+    /// because a safety guard tripped (doom loop, budget exhausted),
+    /// otherwise `None`.
+    ///
+    /// Callers should check this before treating an `Ok(AgentResult)`
+    /// as successful completion — an agent that self-regulated is *not*
+    /// the same as one that finished its task. When both flags are set
+    /// we surface the doom loop: it's the behavioural signal (the agent
+    /// was stuck), while budget exhaustion is the downstream financial
+    /// effect. Operators can act on "stuck"; "ran out of money" is a
+    /// symptom, not a diagnosis.
+    pub fn safety_stop_reason(&self) -> Option<String> {
+        if self.doom_loop_detected {
+            return Some(format!(
+                "doom loop detected after {} iterations / {} tool calls",
+                self.iterations, self.tool_calls
+            ));
+        }
+        if self.budget_exhausted {
+            return Some(format!(
+                "budget exhausted after {} iterations / {} tool calls",
+                self.iterations, self.tool_calls
+            ));
+        }
+        None
+    }
 }
 
 /// Internal outcome for program step execution.

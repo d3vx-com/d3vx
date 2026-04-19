@@ -116,13 +116,40 @@ impl DependencyGraph {
         levels
     }
 
-    /// Validate graph has no cycles
+    /// Validate graph has no cycles.
+    ///
+    /// Previously this relied on `get_execution_levels`'s node-count
+    /// invariant — but that function tolerates cycles by dumping all
+    /// remaining nodes into a final level, so the count always
+    /// matched and `validate` was a no-op. This implementation does a
+    /// real topological walk: any node left unreachable after the
+    /// walk is part of (or depends on) a cycle.
     pub fn validate(&self) -> Result<(), String> {
-        let levels = self.get_execution_levels();
-        let total_nodes: usize = levels.iter().map(|l| l.len()).sum();
-        if total_nodes != self.nodes.len() {
-            return Err("Graph validation failed: not all nodes reachable".to_string());
+        let mut completed = HashSet::new();
+        let mut remaining: HashSet<String> = self.nodes.clone();
+
+        while !remaining.is_empty() {
+            let ready: Vec<String> = remaining
+                .iter()
+                .filter(|n| self.are_dependencies_satisfied(n, &completed))
+                .cloned()
+                .collect();
+
+            if ready.is_empty() {
+                let mut offenders: Vec<String> = remaining.into_iter().collect();
+                offenders.sort(); // deterministic error messages
+                return Err(format!(
+                    "Graph contains a cycle involving: [{}]",
+                    offenders.join(", ")
+                ));
+            }
+
+            for node in &ready {
+                completed.insert(node.clone());
+                remaining.remove(node);
+            }
         }
+
         Ok(())
     }
 }

@@ -167,6 +167,22 @@ pub struct UIState {
     pub model_picker_entering_api_key: bool,
     /// Current input for the API key prompt
     pub model_picker_api_key_input: String,
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // Agent Strip & Drawer State
+    // ════════════════════════════════════════════════════════════════════════════
+    /// Detail drawer height (Closed / 30% / 60% / Full)
+    pub drawer_height: crate::app::state::DrawerHeight,
+    /// Whether the agent strip is expanded (2 rows vs 1 row)
+    pub strip_expanded: bool,
+    /// Scroll offset for the drawer content
+    pub drawer_scroll: usize,
+    /// Total rendered lines in the drawer
+    pub drawer_content_lines: usize,
+    /// ID of the agent shown in the drawer
+    pub drawer_agent_id: Option<String>,
+    /// Line index of first visible line before a drawer resize (for scroll anchoring)
+    pub scroll_anchor_line: Option<usize>,
 }
 
 impl Default for UIState {
@@ -234,6 +250,13 @@ impl Default for UIState {
             model_picker_filter: String::new(),
             model_picker_entering_api_key: false,
             model_picker_api_key_input: String::new(),
+
+            drawer_height: crate::app::state::DrawerHeight::Closed,
+            strip_expanded: false,
+            drawer_scroll: 0,
+            drawer_content_lines: 0,
+            drawer_agent_id: None,
+            scroll_anchor_line: None,
         }
     }
 }

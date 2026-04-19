@@ -284,6 +284,60 @@ async fn test_callbacks() {
     assert_eq!(status_count.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
 
+// ── orchestrator-enforcement tests ───────────────────────────
+//
+// These exercise `TaskQueue::with_orchestrator_enforcement`, which is the
+// runtime defense-in-depth layer behind the compile-time `pub(in crate::pipeline)`
+// visibility on `add_task`. They lock down the two admission keys (`source`,
+// `classification`) that internal callers must set.
+
+#[tokio::test]
+async fn test_enforcement_rejects_task_without_provenance() {
+    let queue = TaskQueue::with_orchestrator_enforcement();
+    let task = Task::new("BARE-001", "bare", "no metadata");
+
+    let err = queue.add_task(task).await.unwrap_err();
+    assert!(
+        matches!(err, QueueError::NotFromOrchestrator(ref id) if id == "BARE-001"),
+        "expected NotFromOrchestrator, got {:?}",
+        err
+    );
+    assert!(!queue.contains("BARE-001").await);
+}
+
+#[tokio::test]
+async fn test_enforcement_accepts_task_with_source_metadata() {
+    let queue = TaskQueue::with_orchestrator_enforcement();
+    let task = Task::new("DECOMP-001", "child", "from decomposition")
+        .with_internal_source("decomposition");
+
+    queue.add_task(task).await.expect("source key should admit");
+    assert!(queue.contains("DECOMP-001").await);
+}
+
+#[tokio::test]
+async fn test_enforcement_accepts_task_with_classification_metadata() {
+    let queue = TaskQueue::with_orchestrator_enforcement();
+    let mut task = Task::new("FACT-001", "factory", "from TaskFactory");
+    task.metadata = serde_json::json!({ "classification": { "mode": "direct" } });
+
+    queue
+        .add_task(task)
+        .await
+        .expect("classification key should admit");
+    assert!(queue.contains("FACT-001").await);
+}
+
+#[tokio::test]
+async fn test_enforcement_rejects_non_object_metadata() {
+    let queue = TaskQueue::with_orchestrator_enforcement();
+    let mut task = Task::new("BAD-001", "bad", "scalar metadata");
+    task.metadata = serde_json::Value::String("source".to_string());
+
+    let err = queue.add_task(task).await.unwrap_err();
+    assert!(matches!(err, QueueError::NotFromOrchestrator(_)));
+}
+
 // ── pure type tests (no async needed) ────────────────────────
 
 #[test]

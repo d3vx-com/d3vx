@@ -105,9 +105,15 @@ impl DecompositionManager {
         plan.start_execution();
         drop(plans);
 
-        // Execute children
+        // Execute children. The lock is released while the executor runs
+        // (it may block for a long time); re-acquire and re-verify the
+        // plan exists on return. Any future feature that prunes plans
+        // concurrently would otherwise race us into a panic here.
         let plan_ref = self.plans.read().await;
-        let plan_clone = plan_ref.get(&id).unwrap().clone();
+        let plan_clone = plan_ref
+            .get(&id)
+            .ok_or(DecompositionError::PlanNotFound(id))?
+            .clone();
         drop(plan_ref);
 
         let statuses = self
@@ -122,7 +128,9 @@ impl DecompositionManager {
 
         // Update plan
         let mut plans = self.plans.write().await;
-        let plan = plans.get_mut(&id).unwrap();
+        let plan = plans
+            .get_mut(&id)
+            .ok_or(DecompositionError::PlanNotFound(id))?;
 
         match status {
             DecompositionStatus::Completed => plan.complete(result),

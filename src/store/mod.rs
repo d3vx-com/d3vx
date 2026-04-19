@@ -25,12 +25,15 @@ pub mod migrations;
 pub mod run;
 pub mod session;
 pub mod task;
+pub mod tool_execution;
 pub mod tool_permissions;
 pub mod worker;
 pub mod workspace;
 
 // Re-export tool permissions store
 pub use tool_permissions::ToolPermissionStore;
+// Re-export tool execution audit store
+pub use tool_execution::{NewToolExecution, ToolExecutionRecord, ToolExecutionStore};
 // Re-export commonly used types from database and session
 pub use database::{Database, DatabaseError};
 pub use message::{MessageRecord, MessageRole, MessageStore};

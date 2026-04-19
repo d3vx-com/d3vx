@@ -2,9 +2,12 @@
 
 use std::collections::HashSet;
 
+use tracing::debug;
+
 use crate::agent::tool_coordinator::ToolExecutionResult;
 use crate::config::types::SandboxMode;
 use crate::ipc::types::{ApprovalDecision, ToolCall, ToolStatus};
+use crate::store::{NewToolExecution, ToolExecutionStore};
 use crate::tools::{ToolContext, ToolResult};
 use crate::utils::diff::generate_unified_diff;
 
@@ -128,9 +131,67 @@ impl AgentLoop {
             self.inject_diagnostics(&mut final_results, working_dir)
                 .await;
 
+            // Audit: append each execution to the tool_executions table so
+            // the dashboard and multi-agent attribution features see real
+            // data. Best-effort — a missing session row or any DB error
+            // must not fail tool execution, so we swallow errors after
+            // logging. The table ships in SCHEMA_V1 but previously had no
+            // writer; this closes that observability gap.
+            self.record_tool_audit(&calls, &final_results, session_id)
+                .await;
+
             final_results
         } else {
             results
+        }
+    }
+
+    /// Append each completed tool call to the audit store. No-op if no
+    /// database is configured.
+    async fn record_tool_audit(
+        &self,
+        calls: &[(String, String, serde_json::Value)],
+        results: &[ToolExecutionResult],
+        session_id: &str,
+    ) {
+        let db_handle = {
+            let config = self.config.read().await;
+            match config.db.clone() {
+                Some(h) => h,
+                None => return,
+            }
+        };
+
+        let db = db_handle.lock();
+        let store = ToolExecutionStore::new(&db);
+
+        for res in results {
+            let input = calls
+                .iter()
+                .find(|(id, _, _)| id == &res.id)
+                .map(|(_, _, input)| input.clone())
+                .unwrap_or(serde_json::Value::Null);
+
+            let record = NewToolExecution {
+                session_id: session_id.to_string(),
+                tool_name: res.name.clone(),
+                tool_input: input,
+                tool_result: Some(res.result.content.clone()),
+                is_error: res.result.is_error,
+                duration_ms: Some(res.elapsed_ms),
+            };
+
+            if let Err(e) = store.record(record) {
+                // Expected for ephemeral sessions with no `sessions` row
+                // (FK constraint). Log at debug so it's visible when
+                // chasing observability gaps, silent in normal ops.
+                debug!(
+                    tool = %res.name,
+                    session = %session_id,
+                    error = %e,
+                    "tool audit record skipped"
+                );
+            }
         }
     }
 

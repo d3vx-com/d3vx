@@ -251,3 +251,130 @@ async fn test_agent_loop_max_iterations() {
         .expect("Agent should finish even if at max iterations");
     assert_eq!(result.iterations, 2);
 }
+
+#[test]
+fn safety_stop_reason_none_for_clean_result() {
+    let r = AgentResult {
+        text: String::new(),
+        usage: TokenUsage::default(),
+        tool_calls: 1,
+        iterations: 1,
+        task_completed: true,
+        budget_exhausted: false,
+        doom_loop_detected: false,
+    };
+    assert!(r.safety_stop_reason().is_none());
+}
+
+#[test]
+fn safety_stop_reason_identifies_doom_loop() {
+    let r = AgentResult {
+        text: String::new(),
+        usage: TokenUsage::default(),
+        tool_calls: 9,
+        iterations: 3,
+        task_completed: false,
+        budget_exhausted: false,
+        doom_loop_detected: true,
+    };
+    let reason = r.safety_stop_reason().expect("must report a reason");
+    assert!(reason.contains("doom loop"));
+    assert!(reason.contains("3") && reason.contains("9"));
+}
+
+#[test]
+fn safety_stop_reason_identifies_budget_exhausted() {
+    let r = AgentResult {
+        text: String::new(),
+        usage: TokenUsage::default(),
+        tool_calls: 42,
+        iterations: 20,
+        task_completed: false,
+        budget_exhausted: true,
+        doom_loop_detected: false,
+    };
+    let reason = r.safety_stop_reason().expect("must report a reason");
+    assert!(reason.contains("budget"));
+}
+
+#[test]
+fn safety_stop_reason_prioritises_doom_loop_over_budget() {
+    // Both flags set — doom loop is the actionable behavioural signal.
+    let r = AgentResult {
+        text: String::new(),
+        usage: TokenUsage::default(),
+        tool_calls: 30,
+        iterations: 10,
+        task_completed: false,
+        budget_exhausted: true,
+        doom_loop_detected: true,
+    };
+    let reason = r.safety_stop_reason().expect("must report a reason");
+    assert!(reason.contains("doom loop"), "got: {reason}");
+    assert!(!reason.contains("budget"));
+}
+
+#[tokio::test]
+async fn test_doom_loop_breaks_agent_loop_and_sets_flag() {
+    // Regression test: the DoomLoopDetector trips at its 3rd identical
+    // tool+input call. Before Phase 7, the agent merely emitted a warning
+    // and kept spending tokens. Now it must break cleanly with
+    // `doom_loop_detected = true` so callers can distinguish runaway stop
+    // from normal completion.
+    let provider = Arc::new(MockProvider::new());
+    let tools = Arc::new(ToolCoordinator::new());
+    // Give plenty of headroom so we're sure the detector — not the
+    // max_iterations guard — is what stops us.
+    let config = AgentConfig {
+        max_iterations: 20,
+        ..AgentConfig::default()
+    };
+
+    // Script 10 identical tool calls. The detector should fire at call 3.
+    for _ in 0..10 {
+        provider.add_response(vec![
+            StreamEvent::ToolUseStart {
+                id: "t1".to_string(),
+                name: "ReadTool".to_string(),
+            },
+            StreamEvent::ToolUseEnd {
+                id: "t1".to_string(),
+                name: "ReadTool".to_string(),
+                input: serde_json::json!({"path": "test.txt"}),
+            },
+            StreamEvent::MessageEnd {
+                usage: TokenUsage::default(),
+                stop_reason: StopReason::ToolUse,
+            },
+        ]);
+    }
+
+    let agent = AgentLoop::new(provider, tools, None, config);
+    agent.add_user_message("Please loop forever").await;
+
+    let result = agent
+        .run()
+        .await
+        .expect("Agent should return cleanly after doom detection");
+
+    assert!(
+        result.doom_loop_detected,
+        "doom_loop_detected flag must be set when detector fires"
+    );
+    // The detector trips on the 3rd call. Iterations are bounded somewhere
+    // between 3 and max_iterations; anything below max proves we stopped
+    // early rather than running out the clock.
+    assert!(
+        result.iterations < 20,
+        "agent must stop before max_iterations when doom loop is detected; got {}",
+        result.iterations
+    );
+    assert!(
+        !result.budget_exhausted,
+        "doom-loop stop must not be conflated with budget exhaustion"
+    );
+    assert!(
+        !result.task_completed,
+        "doom-loop stop is not a normal task completion"
+    );
+}

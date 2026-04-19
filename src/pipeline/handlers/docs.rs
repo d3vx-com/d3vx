@@ -6,7 +6,7 @@ use std::process::Command;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
-use super::types::{PhaseError, PhaseHandler, PhaseResult};
+use super::types::{check_agent_safety, PhaseError, PhaseHandler, PhaseResult};
 use crate::agent::AgentLoop;
 use crate::pipeline::docs_completeness::{DocsCompleteness, DocsCompletenessEvaluator};
 use crate::pipeline::phases::{Phase, PhaseContext, Task};
@@ -124,7 +124,7 @@ impl PhaseHandler for DocsHandler {
         agent.clear_history().await;
         agent.add_user_message(&instruction).await;
 
-        let result = agent.run().await?;
+        let result = check_agent_safety(agent.run().await?)?;
 
         let evaluator =
             DocsCompletenessEvaluator::new(Path::new(&context.worktree_path).to_path_buf());

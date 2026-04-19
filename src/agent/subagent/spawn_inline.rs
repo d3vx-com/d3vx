@@ -167,9 +167,14 @@ impl super::SubAgentManager {
             // Run the agent
             let result = agent_loop.run().await;
 
-            // Update handle status based on whether task was formally completed
+            // Update handle status based on whether task was formally completed.
+            // See `spawn.rs` for rationale on treating safety-stops as failures.
             let result_text = final_result.lock().await.clone();
             let task_completed = result.as_ref().map(|r| r.task_completed).unwrap_or(false);
+            let safety_stop_reason = result
+                .as_ref()
+                .ok()
+                .and_then(|r| r.safety_stop_reason());
             let had_error = result.is_err();
 
             {
@@ -178,6 +183,9 @@ impl super::SubAgentManager {
                     if had_error {
                         agent.status = SubAgentStatus::Failed;
                         agent.error = result.err().map(|e| e.to_string());
+                    } else if let Some(reason) = safety_stop_reason {
+                        agent.status = SubAgentStatus::Failed;
+                        agent.error = Some(format!("Agent stopped for safety: {reason}"));
                     } else if task_completed {
                         agent.status = SubAgentStatus::Completed;
                     } else {

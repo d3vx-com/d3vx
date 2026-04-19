@@ -22,7 +22,6 @@ use super::super::queue_manager;
 use super::super::recovery_manager;
 use super::super::scheduler::{self, ExecutionGuard};
 use super::super::task_factory;
-use super::super::timeout::TimeoutManager;
 use super::super::vex_manager::VexManager;
 use super::super::worker_pool::WorkerPool;
 use super::config::OrchestratorConfig;
@@ -60,7 +59,14 @@ impl PipelineOrchestrator {
         let checkpoint_manager = Arc::new(CheckpointManager::new(&config.checkpoint_dir));
         checkpoint_manager.initialize().await?;
 
-        let engine = Arc::new(PipelineEngine::with_config(config.pipeline.clone()));
+        // Engine handles per-phase timeouts internally via `timeout_config`.
+        // Previously the orchestrator wrapped `run_with_agent` with a single
+        // timeout keyed on `task.phase` (the *starting* phase), which silently
+        // capped every multi-phase task by its first phase's budget.
+        let engine = Arc::new(
+            PipelineEngine::with_config(config.pipeline.clone())
+                .with_timeout_config(config.timeout.clone()),
+        );
         let queue = Arc::new(TaskQueue::with_orchestrator_enforcement());
         let metrics = Arc::new(metrics::MetricsCollector::new(config.cost_tracker.clone()));
         let worker_pool = Arc::new(WorkerPool::new(config.worker_pool.clone()));
@@ -244,18 +250,13 @@ impl PipelineOrchestrator {
             }
         };
 
-        let mut timeout_manager = TimeoutManager::with_config(self.config.timeout.clone());
+        // Per-phase timeouts are enforced inside the engine (see
+        // `PipelineEngine::run_with_agent`). No outer wrap here.
         let agent_opt = self.agent.read().await.clone();
 
         let result = if let Some(agent) = agent_opt {
-            let result_future = async {
-                self.engine
-                    .run_with_agent(task.clone(), context, agent)
-                    .await
-                    .map_err(|e| super::super::handlers::PhaseError::Other(e.to_string()))
-            };
-            timeout_manager
-                .execute_with_timeout(task.phase, result_future)
+            self.engine
+                .run_with_agent(task, context, agent)
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?
         } else {

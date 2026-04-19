@@ -24,9 +24,13 @@ mod activity_panel;
 mod activity_tabs;
 mod activity_tools;
 mod agent_detail;
+mod agent_strip;
+#[cfg(test)]
+mod agent_strip_tests;
 mod batch_detail;
 mod command_palette;
 mod diff_preview;
+mod drawer;
 mod input;
 mod main_render;
 mod mention_picker;

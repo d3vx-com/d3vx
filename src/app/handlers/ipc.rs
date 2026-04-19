@@ -5,7 +5,44 @@ use std::time::Instant;
 use tracing::{debug, error};
 
 use crate::app::{App, ToolExecutionState};
-use crate::ipc::{IpcEvent, Message, MessageRole, ToolStatus};
+use crate::ipc::{IpcEvent, Message, MessageRole, ToolCall, ToolStatus};
+
+/// Route a tool-call update to the message that owns the tool_call id.
+///
+/// Tool-call ids are globally unique. Historically this was routed to
+/// `messages.last_mut()`, which raced in multi-agent sessions: if another
+/// agent pushed a message between the tool_call's creation and its update,
+/// the update would land on the wrong message (or get appended as a
+/// duplicate). We now search all messages newest→oldest so each update
+/// always reaches its owner, regardless of interleaving.
+///
+/// If no message claims the id (a protocol-level anomaly in a well-formed
+/// stream — `IpcEvent::Message` should always arrive first with the
+/// tool_call embedded), we fall back to the newest message so the update
+/// is not silently dropped.
+pub(super) fn route_tool_call_update(messages: &mut Vec<Message>, tool_call: ToolCall) {
+    let tool_call_id = tool_call.id.clone();
+    let mut tool_call = Some(tool_call);
+
+    for msg in messages.iter_mut().rev() {
+        if let Some(existing) = msg
+            .tool_calls
+            .iter_mut()
+            .find(|tc| tc.id == tool_call_id)
+        {
+            // take() here is infallible: matched on this iteration, haven't
+            // moved `tool_call` yet, and we break immediately after.
+            *existing = tool_call.take().expect("tool_call consumed exactly once");
+            return;
+        }
+    }
+
+    if let Some(tc) = tool_call {
+        if let Some(last_msg) = messages.last_mut() {
+            last_msg.tool_calls.push(tc);
+        }
+    }
+}
 
 impl App {
     /// Handle an IPC event
@@ -82,19 +119,7 @@ impl App {
                     }
                 }
 
-                // Find the latest message and add/update tool call
-                if let Some(last_msg) = self.session.messages.last_mut() {
-                    // Find existing tool call or add new one
-                    if let Some(tc) = last_msg
-                        .tool_calls
-                        .iter_mut()
-                        .find(|tc| tc.id == tool_call.id)
-                    {
-                        *tc = tool_call;
-                    } else {
-                        last_msg.tool_calls.push(tool_call);
-                    }
-                }
+                route_tool_call_update(&mut self.session.messages, tool_call);
             }
             IpcEvent::Thinking(state) => {
                 // Track thinking start time

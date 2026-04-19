@@ -18,7 +18,9 @@ use tracing::{info, warn};
 
 use super::sse;
 use super::static_assets;
-use super::types::{BudgetInfo, ModelCost, SessionDetailResponse, SystemStats, TaskRow};
+use super::types::{
+    BudgetInfo, ModelCost, SessionDetailResponse, SystemStats, TaskRow, ToolExecutionRow,
+};
 use super::Dashboard;
 
 // ---------------------------------------------------------------------------
@@ -297,6 +299,52 @@ pub struct SendMessageRequest {
 // Router
 // ---------------------------------------------------------------------------
 
+/// GET /api/tools — recent tool executions across all sessions.
+///
+/// Query param `limit` (default 100, clamped to 500) bounds the result.
+/// Ordered newest-first.
+async fn list_recent_tools(
+    State(dashboard): State<Dashboard>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> Response {
+    let limit = params
+        .get("limit")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(100)
+        .min(500);
+
+    let db = dashboard.db();
+    let db_lock = db.lock();
+    let store = crate::store::ToolExecutionStore::new(&db_lock);
+
+    match store.list_recent(limit) {
+        Ok(records) => json_ok(map_tool_records_to_rows(records)),
+        Err(e) => {
+            warn!("Failed to list recent tool executions: {}", e);
+            json_ok(Vec::<ToolExecutionRow>::new())
+        }
+    }
+}
+
+/// GET /api/sessions/:id/tools — tool executions for a specific session,
+/// oldest-first (chronological replay).
+async fn list_session_tools(
+    State(dashboard): State<Dashboard>,
+    Path(session_id): Path<String>,
+) -> Response {
+    let db = dashboard.db();
+    let db_lock = db.lock();
+    let store = crate::store::ToolExecutionStore::new(&db_lock);
+
+    match store.list_for_session(&session_id) {
+        Ok(records) => json_ok(map_tool_records_to_rows(records)),
+        Err(e) => {
+            warn!("Failed to list session tool executions: {}", e);
+            json_ok(Vec::<ToolExecutionRow>::new())
+        }
+    }
+}
+
 pub fn create_router(dashboard: Dashboard) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -312,6 +360,8 @@ pub fn create_router(dashboard: Dashboard) -> Router {
         .route("/stats", get(get_stats))
         .route("/costs", get(get_costs))
         .route("/budget", get(get_budget))
+        .route("/tools", get(list_recent_tools))
+        .route("/sessions/{id}/tools", get(list_session_tools))
         .route("/events", get(sse::events_stream));
 
     let static_dir = ServeDir::new(static_assets::static_dir());
@@ -326,6 +376,34 @@ pub fn create_router(dashboard: Dashboard) -> Router {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+fn map_tool_records_to_rows(
+    records: Vec<crate::store::ToolExecutionRecord>,
+) -> Vec<ToolExecutionRow> {
+    records
+        .into_iter()
+        .map(|r| {
+            // Truncate input preview to keep payloads small. Arbitrary
+            // JSON inputs can be megabytes (e.g. large Edit bodies) —
+            // the dashboard renders a summary, not the raw blob.
+            let mut preview = r.tool_input;
+            const MAX_PREVIEW: usize = 200;
+            if preview.len() > MAX_PREVIEW {
+                preview.truncate(MAX_PREVIEW);
+                preview.push('…');
+            }
+            ToolExecutionRow {
+                id: r.id,
+                session_id: r.session_id,
+                tool_name: r.tool_name,
+                input_preview: preview,
+                is_error: r.is_error,
+                duration_ms: r.duration_ms,
+                created_at: r.created_at,
+            }
+        })
+        .collect()
+}
 
 fn map_tasks_to_rows(tasks: Vec<crate::store::Task>) -> Vec<TaskRow> {
     tasks
@@ -487,6 +565,180 @@ mod tests {
             )
             .await
             .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_tools_endpoint_returns_ok_empty_by_default() {
+        let app = create_router(test_dashboard());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/tools")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["success"], true);
+        assert!(json["data"].as_array().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_tools_endpoint_returns_recorded_executions() {
+        // End-to-end: write via the store, read via the HTTP endpoint.
+        let dashboard = test_dashboard();
+        let session_id = {
+            let db = dashboard.db();
+            let db_lock = db.lock();
+            let session_store = crate::store::SessionStore::new(&db_lock);
+            session_store
+                .create(crate::store::session::NewSession {
+                    id: None,
+                    task_id: None,
+                    provider: "anthropic".to_string(),
+                    model: "claude-sonnet-4".to_string(),
+                    messages: None,
+                    token_count: None,
+                    summary: None,
+                    project_path: None,
+                    parent_session_id: None,
+                    metadata: None,
+                    state: None,
+                })
+                .unwrap()
+                .id
+        };
+
+        {
+            let db = dashboard.db();
+            let db_lock = db.lock();
+            let store = crate::store::ToolExecutionStore::new(&db_lock);
+            store
+                .record(crate::store::NewToolExecution {
+                    session_id: session_id.clone(),
+                    tool_name: "Bash".to_string(),
+                    tool_input: serde_json::json!({ "command": "ls" }),
+                    tool_result: Some("file-a\nfile-b".to_string()),
+                    is_error: false,
+                    duration_ms: Some(55),
+                })
+                .unwrap();
+        }
+
+        let app = create_router(dashboard);
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/tools")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let rows = json["data"].as_array().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["tool_name"], "Bash");
+        assert_eq!(rows[0]["session_id"], session_id);
+        assert_eq!(rows[0]["is_error"], false);
+        assert_eq!(rows[0]["duration_ms"], 55);
+        assert!(rows[0]["input_preview"].as_str().unwrap().contains("ls"));
+    }
+
+    #[tokio::test]
+    async fn test_session_tools_endpoint_returns_per_session_records() {
+        let dashboard = test_dashboard();
+        let (s1, s2) = {
+            let db = dashboard.db();
+            let db_lock = db.lock();
+            let session_store = crate::store::SessionStore::new(&db_lock);
+            let mk = || {
+                session_store
+                    .create(crate::store::session::NewSession {
+                        id: None,
+                        task_id: None,
+                        provider: "anthropic".to_string(),
+                        model: "claude-sonnet-4".to_string(),
+                        messages: None,
+                        token_count: None,
+                        summary: None,
+                        project_path: None,
+                        parent_session_id: None,
+                        metadata: None,
+                        state: None,
+                    })
+                    .unwrap()
+                    .id
+            };
+            (mk(), mk())
+        };
+
+        {
+            let db = dashboard.db();
+            let db_lock = db.lock();
+            let store = crate::store::ToolExecutionStore::new(&db_lock);
+            for (session, tool) in [(&s1, "Read"), (&s2, "Bash"), (&s1, "Edit")] {
+                store
+                    .record(crate::store::NewToolExecution {
+                        session_id: session.clone(),
+                        tool_name: tool.to_string(),
+                        tool_input: serde_json::Value::Null,
+                        tool_result: None,
+                        is_error: false,
+                        duration_ms: None,
+                    })
+                    .unwrap();
+            }
+        }
+
+        let app = create_router(dashboard);
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri(&format!("/api/sessions/{s1}/tools"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let rows = json["data"].as_array().unwrap();
+        assert_eq!(rows.len(), 2);
+        // Chronological: Read then Edit for this session.
+        assert_eq!(rows[0]["tool_name"], "Read");
+        assert_eq!(rows[1]["tool_name"], "Edit");
+    }
+
+    #[tokio::test]
+    async fn test_tools_endpoint_clamps_limit() {
+        let app = create_router(test_dashboard());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/tools?limit=99999")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // Clamping is internal — visible only as a successful 200.
         assert_eq!(resp.status(), StatusCode::OK);
     }
 }

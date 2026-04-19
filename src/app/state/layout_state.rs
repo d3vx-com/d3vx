@@ -54,6 +54,12 @@ pub struct LayoutState {
     pub last_tab_bar_rect: Option<Rect>,
     /// Last rendered mode bar rect for click detection
     pub last_mode_bar_rect: Option<Rect>,
+    /// Last rendered drawer rect (None when closed)
+    pub last_drawer_rect: Option<Rect>,
+    /// Last rendered agent strip rect (None when no agents)
+    pub last_strip_rect: Option<Rect>,
+    /// Rendered pill positions in the agent strip: (start_col, end_col, agent_index)
+    pub strip_pill_positions: Vec<(u16, u16, usize)>,
 }
 
 impl Default for LayoutState {
@@ -73,6 +79,9 @@ impl Default for LayoutState {
             last_agent_detail_rect: None,
             last_tab_bar_rect: None,
             last_mode_bar_rect: None,
+            last_drawer_rect: None,
+            last_strip_rect: None,
+            strip_pill_positions: Vec::new(),
         }
     }
 }
@@ -94,6 +103,9 @@ impl LayoutState {
         self.last_agent_detail_rect = None;
         self.last_tab_bar_rect = None;
         self.last_mode_bar_rect = None;
+        self.last_drawer_rect = None;
+        self.last_strip_rect = None;
+        self.strip_pill_positions.clear();
     }
 
     /// Check if any layout is being tracked

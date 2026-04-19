@@ -100,8 +100,14 @@ impl App {
                     self.ui.escape_count = 1;
                 }
 
-                // First ESC: dismiss welcome
-                if self.ui.show_welcome {
+                // First ESC: close drawer if open
+                if self.ui.drawer_height != crate::app::state::DrawerHeight::Closed {
+                    self.save_scroll_anchor();
+                    self.ui.drawer_height = crate::app::state::DrawerHeight::Closed;
+                    self.ui.escape_count = 0;
+                }
+                // Second: dismiss welcome
+                else if self.ui.show_welcome {
                     self.ui.show_welcome = false;
                     self.ui.escape_count = 0;
                 }

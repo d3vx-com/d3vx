@@ -146,6 +146,17 @@ strip = true
 opt-level = 0
 debug = true
 
+# Shrink dev target/ by dropping full DWARF from dependencies.
+# Our crate keeps full debug info; dep frames keep line numbers only, so
+# panics and stack traces through tokio/ratatui/reqwest/tree-sitter stay
+# navigable. Typically cuts target/debug/ by 50–70% on this dep graph.
+[profile.dev.package."*"]
+debug = "line-tables-only"
+
+# Build scripts run once and don't need debug info at all.
+[profile.dev.build-override]
+debug = false
+
 [[bin]]
 name = "d3vx"
 path = "src/main.rs"

@@ -76,6 +76,15 @@ async fn run_standalone_mode(opts: TuiOptions) -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
+    // Install a panic hook BEFORE running the app. If the async event
+    // loop panics (e.g. a surprise `block_on`-from-within-runtime), the
+    // default unwind bypasses the cleanup below — leaving raw mode on,
+    // mouse capture enabled, and the alt screen still selected. The
+    // user sees garbled escape sequences in their shell for hours after.
+    // The hook restores terminal state first, then delegates to the
+    // original hook so backtraces still print.
+    install_panic_hook_standalone();
+
     // Force standalone mode - no IPC parent process in pure Rust
     std::env::set_var("D3VX_TUI_MODE", "standalone");
 
@@ -138,6 +147,10 @@ async fn run_ipc_mode(opts: TuiOptions) -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
+    // See `install_panic_hook_standalone` — same rationale, but write the
+    // cleanup sequences to /dev/tty since IPC mode doesn't use stdout.
+    install_panic_hook_ipc();
+
     // Force standalone mode - no IPC parent process in pure Rust
     std::env::set_var("D3VX_TUI_MODE", "standalone");
 
@@ -182,6 +195,44 @@ fn cleanup_ipc_terminal(tty_fd: i32) -> io::Result<()> {
         );
     }
     Ok(())
+}
+
+/// Install a one-shot terminal-restoring panic hook for standalone mode.
+///
+/// Chained in front of the existing (usually default) hook so that on any
+/// panic:
+/// 1. Raw mode is disabled (cursor key events no longer show as garbage).
+/// 2. Cursor is shown, alt screen is left, mouse capture is disabled.
+/// 3. Colours are reset.
+/// 4. The original hook runs so backtraces still print to the shell.
+///
+/// Best-effort: every step ignores errors (we're already unwinding — a
+/// second panic here would abort the process).
+fn install_panic_hook_standalone() {
+    let original = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = terminal::disable_raw_mode();
+        let _ = cleanup_terminal();
+        original(info);
+    }));
+}
+
+/// Install a terminal-restoring panic hook for IPC mode. Writes the
+/// same cleanup escape sequences as [`cleanup_ipc_terminal`] but reopens
+/// /dev/tty at panic time so the hook owns no file descriptor between
+/// panics. Best-effort — errors are ignored.
+fn install_panic_hook_ipc() {
+    let original = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        // Re-open /dev/tty for writing. If that fails there's nothing
+        // useful we can do — fall through to the original hook.
+        if let Ok(mut tty) = File::options().write(true).open("/dev/tty") {
+            let cleanup = b"\x1b[?1049l\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[0m\x1b[H\x1b[2J";
+            let _ = tty.write_all(cleanup);
+            let _ = tty.flush();
+        }
+        original(info);
+    }));
 }
 
 /// Setup terminal for IPC mode using /dev/tty

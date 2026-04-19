@@ -107,7 +107,21 @@ Requirements:\n\
 
         let run_result = agent.run().await;
         let agent_text = match run_result {
-            Ok(result) => result.text,
+            Ok(result) => {
+                if let Some(reason) = result.safety_stop_reason() {
+                    agent.clear_history().await;
+                    for message in original_messages {
+                        agent.add_message(message).await;
+                    }
+                    agent.set_system_prompt(original_prompt).await;
+                    agent.set_working_dir(original_working_dir).await;
+                    return Err(anyhow::anyhow!(
+                        "agent conflict resolution stopped for safety: {}",
+                        reason
+                    ));
+                }
+                result.text
+            }
             Err(error) => {
                 agent.clear_history().await;
                 for message in original_messages {
