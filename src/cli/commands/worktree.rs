@@ -187,9 +187,10 @@ async fn discard_worktree(task_id: &str) -> Result<()> {
             .arg(path)
             .output()?;
         if !output.status.success() {
-            eprintln!(
-                "warning: worktree remove failed: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
+            tracing::warn!(
+                target: "worktree",
+                stderr = %String::from_utf8_lossy(&output.stderr).trim(),
+                "worktree remove failed"
             );
         }
     }

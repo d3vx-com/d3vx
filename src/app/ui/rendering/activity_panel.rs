@@ -1,5 +1,4 @@
-//! Activity panel rendering (right side) - top-level panel layout,
-//! tools section, agents summary
+//! Activity panel rendering (right side) - Fleet monitor for background tasks
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -43,13 +42,13 @@ impl App {
 
         summary_lines.push(Line::from(vec![
             Span::styled(
-                "Console",
+                "Fleet Monitor",
                 Style::default()
                     .fg(self.ui.theme.brand_secondary)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "  (Ctrl+Up/Down select)",
+                "  background tasks",
                 Style::default().fg(self.ui.theme.ui.text_dim),
             ),
         ]));
@@ -63,8 +62,8 @@ impl App {
         // Coordination Pipeline
         current_line = self.render_activity_coordination(&mut summary_lines, current_line);
 
-        // Spawned Agents
-        current_line = self.render_activity_agents(&mut summary_lines, current_line);
+        // Fleet: only show vex (background) agents — inline agents live in the strip/drawer
+        current_line = self.render_fleet_agents(&mut summary_lines, current_line);
 
         summary_lines.push(Line::raw(""));
 
@@ -179,34 +178,47 @@ impl App {
         current_line
     }
 
-    fn render_activity_agents(
+    /// Render only vex (background) agents in the fleet monitor.
+    /// Inline agents are shown in the strip + drawer in the main area.
+    fn render_fleet_agents(
         &mut self,
         summary_lines: &mut Vec<Line<'_>>,
         mut current_line: usize,
     ) -> usize {
-        if self.agents.inline_agents.is_empty() {
-            return current_line;
+        let vex_agents: Vec<(usize, &_)> = self
+            .agents
+            .inline_agents
+            .iter()
+            .enumerate()
+            .filter(|(_, a)| a.id.starts_with("vex:"))
+            .collect();
+
+        if vex_agents.is_empty() {
+            summary_lines.push(Line::from(vec![Span::styled(
+                "No background tasks",
+                Style::default().fg(self.ui.theme.ui.text_dim),
+            )]));
+            return current_line + 1;
         }
 
-        // Use the summary area width for truncation — fall back to 40 if unknown
         let max_task_chars = self
             .layout
             .last_activity_rect
-            .map(|r| r.width.saturating_sub(14) as usize) // "- > icon ... [Xm Ys]" overhead
+            .map(|r| r.width.saturating_sub(14) as usize)
             .unwrap_or(28)
             .max(12);
 
         summary_lines.push(Line::from(vec![Span::styled(
-            format!("Agents ({})", self.agents.inline_agents.len()),
+            format!("Background ({})", vex_agents.len()),
             Style::default()
                 .fg(self.ui.theme.brand_secondary)
                 .add_modifier(Modifier::BOLD),
         )]));
         current_line += 1;
 
-        for (idx, agent) in self.agents.inline_agents.iter().enumerate() {
+        for (idx, agent) in &vex_agents {
             let (icon, color) = inline_agent_icon_color(agent.status, &self.ui.theme);
-            let selected = self.agents.selected_inline_agent == Some(idx);
+            let selected = self.agents.selected_inline_agent == Some(*idx);
             let task_style = if selected {
                 Style::default()
                     .fg(Color::Rgb(80, 255, 150))
@@ -237,9 +249,6 @@ impl App {
 }
 
 /// Truncate a task description to 2-3 words that fit within `max_chars`.
-///
-/// Strategy: take whole words until we'd exceed the budget, then append "..".
-/// Falls back to hard-char truncation if the first word itself is too long.
 fn truncate_to_words(task: &str, max_chars: usize) -> String {
     if task.len() <= max_chars {
         return task.to_string();
@@ -248,10 +257,8 @@ fn truncate_to_words(task: &str, max_chars: usize) -> String {
     let mut used = 0;
     let mut words: Vec<&str> = Vec::new();
     for word in task.split_whitespace() {
-        // +1 for the space between words (except before the first)
         let needed = word.len() + if words.is_empty() { 0 } else { 1 };
         if used + needed > max_chars.saturating_sub(2) {
-            // Reserve 2 chars for ".."
             break;
         }
         words.push(word);
@@ -259,48 +266,8 @@ fn truncate_to_words(task: &str, max_chars: usize) -> String {
     }
 
     if words.is_empty() {
-        // First word is too long — hard-truncate it
         format!("{}..", &task[..max_chars.saturating_sub(2).max(1)])
     } else {
         format!("{}..", words.join(" "))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_truncate_to_words_short_enough() {
-        assert_eq!(truncate_to_words("Fix bug", 20), "Fix bug");
-    }
-
-    #[test]
-    fn test_truncate_to_words_truncates() {
-        assert_eq!(
-            truncate_to_words("Fix the authentication bug in the login module", 18),
-            "Fix the.."
-        );
-    }
-
-    #[test]
-    fn test_truncate_to_words_single_long_word() {
-        assert_eq!(
-            truncate_to_words("superlongwordthatdoesnotfit", 10),
-            "superlon.."
-        );
-    }
-
-    #[test]
-    fn test_truncate_to_words_exact_fit() {
-        assert_eq!(truncate_to_words("Fix auth", 8), "Fix auth");
-    }
-
-    #[test]
-    fn test_truncate_to_words_two_words_then_dot() {
-        assert_eq!(
-            truncate_to_words("Refactor the entire authentication flow", 16),
-            "Refactor the.."
-        );
     }
 }

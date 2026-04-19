@@ -103,23 +103,85 @@ impl App {
 
         let activity_area = right_area;
 
-        // Simple vertical split: chat (flex) + input (fixed)
+        // ── Dynamic vertical layout: Chat + Drawer + Strip + Input ──
+        use crate::app::state::DrawerHeight;
+
+        let agent_count = self.agents.inline_agents.len();
+        let strip_rows: u16 = if agent_count == 0 {
+            0
+        } else if self.ui.strip_expanded {
+            2
+        } else {
+            1
+        };
+
+        let mut constraints: Vec<Constraint> = Vec::new();
+
+        // Chat + Drawer share the flexible space
+        match self.ui.drawer_height {
+            DrawerHeight::Closed => {
+                constraints.push(Constraint::Min(0)); // chat takes all
+            }
+            DrawerHeight::Percent30 => {
+                constraints.push(Constraint::Percentage(70)); // chat
+                constraints.push(Constraint::Percentage(30)); // drawer
+            }
+            DrawerHeight::Percent60 => {
+                constraints.push(Constraint::Percentage(40)); // chat
+                constraints.push(Constraint::Percentage(60)); // drawer
+            }
+            DrawerHeight::Full => {
+                constraints.push(Constraint::Length(0)); // chat hidden
+                constraints.push(Constraint::Min(0)); // drawer full
+            }
+        }
+
+        // Agent strip (0 when no agents)
+        if strip_rows > 0 {
+            constraints.push(Constraint::Length(strip_rows));
+        }
+
+        // Input area (always 3 rows)
+        constraints.push(Constraint::Length(3));
+
         let main_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(0),
-                Constraint::Length(3), // Input area + focus mode chips
-            ])
+            .constraints(constraints)
             .split(main_area);
 
-        let chat_area = main_chunks[0];
-        let input_area = main_chunks[1];
+        // Unpack dynamic chunks
+        let mut idx = 0;
+        let chat_area = main_chunks[idx];
+        idx += 1;
+
+        let drawer_area = if self.ui.drawer_height != DrawerHeight::Closed {
+            let rect = main_chunks[idx];
+            idx += 1;
+            Some(rect)
+        } else {
+            None
+        };
+
+        let strip_area = if strip_rows > 0 {
+            let rect = main_chunks[idx];
+            idx += 1;
+            Some(rect)
+        } else {
+            None
+        };
+
+        let input_area = main_chunks[idx];
 
         // Store rects for mouse hit-testing
         self.layout.last_left_sidebar_rect = Rect::default();
         self.layout.last_right_sidebar_rect = activity_area.unwrap_or(Rect::default());
         self.layout.last_input_rect = input_area;
         self.layout.last_chat_rect = chat_area;
+        self.layout.last_drawer_rect = drawer_area;
+        self.layout.last_strip_rect = strip_area;
+
+        // Restore scroll anchor after layout change
+        self.restore_scroll_anchor();
 
         // Render welcome or messages or board
         if self.ui.mode == AppMode::Board {
@@ -128,7 +190,7 @@ impl App {
             self.render_task_list(f, chat_area);
         } else if self.ui.show_welcome && self.session.messages.is_empty() {
             self.render_welcome(f, chat_area);
-        } else {
+        } else if chat_area.height > 0 {
             // Add padding around chat area
             let chat_inner_area = Rect {
                 x: chat_area.x + 2,
@@ -139,6 +201,16 @@ impl App {
 
             let messages = self.render_messages(chat_inner_area);
             f.render_widget(messages, chat_inner_area);
+        }
+
+        // Render detail drawer (full-width agent output)
+        if let Some(drawer_rect) = drawer_area {
+            self.render_drawer(f, drawer_rect);
+        }
+
+        // Render agent strip (fleet status pills)
+        if let Some(strip_rect) = strip_area {
+            self.render_agent_strip(f, strip_rect);
         }
 
         // Render activity panel with ratatui border separator

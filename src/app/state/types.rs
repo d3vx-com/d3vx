@@ -123,6 +123,27 @@ pub enum WorkspaceType {
     SubAgent,  // Parallel agent loop
 }
 
+/// Detail drawer height steps, cycled by Ctrl+W.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DrawerHeight {
+    #[default]
+    Closed,
+    Percent30,
+    Percent60,
+    Full,
+}
+
+impl DrawerHeight {
+    pub fn cycle(self) -> Self {
+        match self {
+            Self::Closed => Self::Percent30,
+            Self::Percent30 => Self::Percent60,
+            Self::Percent60 => Self::Full,
+            Self::Full => Self::Closed,
+        }
+    }
+}
+
 /// Represents an isolated agent worktree/task
 #[derive(Debug, Clone)]
 pub struct WorkspaceTask {

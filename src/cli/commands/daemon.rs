@@ -138,7 +138,7 @@ pub(crate) async fn run_daemon_foreground() -> Result<()> {
     let (recovered, last_recovery_error) = match orchestrator.recover_interrupted_tasks().await {
         Ok(tasks) => (tasks, None),
         Err(error) => {
-            eprintln!("daemon recovery failed: {}", error);
+            tracing::error!(target: "daemon", %error, "daemon recovery failed");
             (Vec::new(), Some(error.to_string()))
         }
     };
@@ -202,7 +202,7 @@ pub(crate) async fn run_daemon_foreground() -> Result<()> {
                 orchestrator.audit_active_prs().await;
             }
             Err(error) => {
-                eprintln!("daemon dispatch failed: {}", error);
+                tracing::error!(target: "daemon", %error, "daemon dispatch failed");
                 last_dispatch_error = Some(error.to_string());
             }
         }

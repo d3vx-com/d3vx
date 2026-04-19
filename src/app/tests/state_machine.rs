@@ -972,21 +972,18 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-    async fn test_ctrl_tab_cycles_focus_mode() {
+    async fn test_ctrl_f_cycles_focus_mode() {
         let mut app = test_app().await;
         assert_eq!(app.ui.focus_mode, FocusMode::Chat);
 
-        app.handle_key_event(key_mod(KeyCode::Tab, KeyModifiers::CONTROL))
+        app.handle_key_event(key_mod(KeyCode::Char('f'), KeyModifiers::CONTROL))
             .await
             .unwrap();
         assert_eq!(app.ui.focus_mode, FocusMode::Build);
 
-        app.handle_key_event(key_mod(
-            KeyCode::Tab,
-            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
-        ))
-        .await
-        .unwrap();
-        assert_eq!(app.ui.focus_mode, FocusMode::Chat);
+        app.handle_key_event(key_mod(KeyCode::Char('f'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+        assert_eq!(app.ui.focus_mode, FocusMode::Plan);
     }
 }
