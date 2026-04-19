@@ -203,11 +203,32 @@ impl App {
         self.session.thinking_start = None;
         self.agents.streaming_message.clear();
 
+        // Fire-and-forget the graceful stop. The previous implementation
+        // called `Handle::current().block_on(…)` here, which panics with
+        // "Cannot start a runtime from within a runtime" — because this
+        // method is reached synchronously from the async `handle_key_event`
+        // chain (e.g. Ctrl+C → stop_conversation → stop_agent). The panic
+        // unwound past the terminal-cleanup step in the runner, leaving
+        // the shell in raw mode + mouse capture until the user forcibly
+        // reset it.
+        //
+        // `agent.stop()` only writes `paused = true` on an `Arc<RwLock>`
+        // — there's nothing to wait on, so spawning the completion is
+        // both safe and semantically correct. If no runtime is active
+        // (defensive edge case; today the only callers are async), we
+        // skip the async stop and let the agent observe the state change
+        // on its next iteration.
         if let Some(agent) = &self.agents.agent_loop {
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(async {
-                agent.stop().await;
-            });
+            let agent = agent.clone();
+            if tokio::runtime::Handle::try_current().is_ok() {
+                tokio::spawn(async move {
+                    agent.stop().await;
+                });
+            } else {
+                tracing::debug!(
+                    "stop_agent called outside a tokio runtime; skipping async stop"
+                );
+            }
         }
 
         if !silent {
