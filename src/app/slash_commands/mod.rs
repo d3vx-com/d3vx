@@ -14,6 +14,7 @@ mod core;
 mod discovery;
 mod modes;
 mod navigation;
+mod plans;
 mod session;
 mod setup;
 mod tools;
@@ -27,6 +28,7 @@ use super::{App, AppMode};
 pub use agent::{handle_compact, handle_spawn, handle_thinking, handle_vex};
 pub use core::{handle_clear, handle_cost, handle_quit, handle_status, show_help};
 pub use discovery::{daemon_is_running, handle_daemon, handle_dashboard};
+pub use plans::{handle_plans, plans_count_active};
 pub use modes::{
     handle_mode, handle_model, handle_plan, handle_power, handle_verbose, handle_vibe,
 };
@@ -91,6 +93,13 @@ pub const SLASH_COMMANDS: &[SlashCommand] = &[
         usage: "/daemon",
         category: "Discovery",
         handler: handle_daemon,
+    },
+    SlashCommand {
+        name: "plans",
+        description: "List plan files in .d3vx/plans/",
+        usage: "/plans",
+        category: "Discovery",
+        handler: handle_plans,
     },
     // ── Modes & views ────────────────────────────────────────────
     SlashCommand {

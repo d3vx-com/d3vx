@@ -187,6 +187,19 @@ impl App {
         ));
         spans.push(Span::styled("bg", Style::default().fg(LABEL)));
 
+        // Plans indicator — only rendered when there's in-flight
+        // planner work. Hidden when zero, so the strip doesn't
+        // advertise a feature the user isn't currently using.
+        let plans = crate::app::slash_commands::plans_count_active(self.cwd.as_deref());
+        if plans > 0 {
+            spans.push(sep());
+            spans.push(Span::styled(
+                format!("{plans} "),
+                Style::default().fg(DOT_ON).add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::styled("plans", Style::default().fg(LABEL)));
+        }
+
         spans.push(sep());
 
         // Help hint — always on, always reachable.
