@@ -133,6 +133,15 @@ impl App {
             return Ok(());
         }
 
+        // If the daemon isn't running, the task will be queued in
+        // SQLite but nothing will dispatch it. Warn loudly — silent
+        // data loss is the worst possible UX.
+        if !crate::app::slash_commands::daemon_is_running() {
+            self.add_system_message(
+                "⚠ Daemon is not running — this task will be queued but won't execute until a daemon is active.\n  Start it with: d3vx daemon start --detach  (or restart d3vx without --no-daemon)",
+            );
+        }
+
         // Create branch name from description (lowercase, no spaces)
         let branch_name = format!(
             "vex/{}",
@@ -396,12 +405,32 @@ impl App {
             let _ = orchestrator.dispatch_tasks_parallel(3).await;
         });
 
+        // Keep the final confirmation short. The user just queued
+        // background work; a wall of hints is noise. Surface: the
+        // short id (referenceable), where to watch progress, and
+        // just the non-default policy bits.
+        let short_id = if task_id.len() >= 8 {
+            &task_id[..8]
+        } else {
+            task_id.as_str()
+        };
+        let mut policy_bits: Vec<&str> = Vec::new();
+        if flags.review_required() {
+            policy_bits.push("review");
+        }
+        if flags.merge {
+            policy_bits.push("auto-merge");
+        }
+        if flags.docs {
+            policy_bits.push("docs");
+        }
+        let policy_note = if policy_bits.is_empty() {
+            String::new()
+        } else {
+            format!(" · {}", policy_bits.join(", "))
+        };
         self.add_system_message(&format!(
-            "Background task {} is running. Open /agents or press Ctrl+A to monitor it. Policy: review={} merge={} docs={}. Use Alt+Left/Right to switch workspaces, and Ctrl+L to show or hide the navigator.",
-            task_id,
-            flags.review_required(),
-            flags.merge,
-            flags.docs,
+            "Queued as [{short_id}]{policy_note} · /vex list to monitor · /dashboard for details"
         ));
 
         Ok(())

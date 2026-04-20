@@ -56,6 +56,12 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub vex: bool,
 
+    /// Do not auto-start the background daemon on launch. By default,
+    /// d3vx spawns the daemon detached so background tasks survive
+    /// the TUI closing. Pass --no-daemon for ad-hoc / transient runs.
+    #[arg(long, global = true)]
+    pub no_daemon: bool,
+
     /// Resume last session
     #[arg(short, long, global = true)]
     pub r#continue: bool,

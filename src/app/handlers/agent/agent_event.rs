@@ -92,7 +92,20 @@ impl App {
                 self.session.token_usage = final_usage;
                 self.session.thinking_start = None;
             }
-            crate::agent::AgentEvent::Error { .. } => {
+            crate::agent::AgentEvent::Error { error } => {
+                // Surface the error so the user doesn't stare at a
+                // frozen chat wondering what happened. Before: this
+                // arm threw the payload away and only logged to
+                // tracing, which meant running without RUST_LOG made
+                // failures invisible. Now: a system message goes in
+                // the chat log (so it's scrollable / copy-able) and
+                // a toast fires (so the user notices even if they're
+                // looking elsewhere).
+                self.add_system_message(&format!("✗ Agent error: {error}"));
+                self.add_notification(
+                    format!("Agent error: {error}"),
+                    crate::app::state::NotificationType::Error,
+                );
                 self.session.thinking_start = None;
                 self.check_queue()?;
             }

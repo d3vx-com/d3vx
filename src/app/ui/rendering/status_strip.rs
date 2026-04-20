@@ -64,6 +64,8 @@ impl App {
     }
 
     fn strip_left_spans(&self) -> Vec<Span<'static>> {
+        use crate::app::AppMode;
+
         let mut spans: Vec<Span<'static>> = Vec::new();
 
         // Mode dot + label.
@@ -76,6 +78,18 @@ impl App {
             mode_label.to_string(),
             Style::default().fg(VALUE).add_modifier(Modifier::BOLD),
         ));
+
+        // Exit hint when in a mode that takes over the main area.
+        // Without this, users who typed `/board` or `/list` get stuck
+        // in the view with no visible way back — Esc works but is
+        // undiscoverable. Hint is dim so it doesn't fight for
+        // attention with real status.
+        if matches!(self.ui.mode, AppMode::Board | AppMode::List) {
+            spans.push(Span::styled(
+                "  Esc to return".to_string(),
+                Style::default().fg(LABEL),
+            ));
+        }
 
         spans.push(sep());
 
@@ -103,6 +117,29 @@ impl App {
     fn strip_right_spans(&self) -> Vec<Span<'static>> {
         let mut spans: Vec<Span<'static>> = Vec::new();
 
+        // Setup state — most critical signal, leftmost of the right
+        // cluster. Only appears when there's a problem (missing
+        // config/key). Green dot would be clutter; the absence of a
+        // warning *is* the success state.
+        let onboarding = crate::config::check_onboarding_status();
+        if onboarding.is_first_run || onboarding.needs_api_key_setup {
+            spans.push(Span::styled(
+                "setup ",
+                Style::default().fg(Color::Rgb(220, 100, 100)),
+            ));
+            spans.push(Span::styled(
+                "\u{25CF} ",
+                Style::default().fg(Color::Rgb(220, 100, 100)),
+            ));
+            spans.push(Span::styled(
+                "/setup",
+                Style::default()
+                    .fg(Color::Rgb(220, 180, 60))
+                    .add_modifier(Modifier::BOLD),
+            ));
+            spans.push(sep());
+        }
+
         // Dashboard indicator. Dot + port when running; hollow dot
         // when absent.
         let (dash_dot, dash_color) = if self.dashboard.is_some() {
@@ -121,6 +158,23 @@ impl App {
                 Style::default().fg(VALUE),
             ));
         }
+
+        spans.push(sep());
+
+        // Daemon indicator — this is the "will my vex tasks survive?"
+        // signal. Filled-green = on, hollow-amber = off (important
+        // enough to warrant a non-muted colour when absent).
+        let daemon_on = crate::app::slash_commands::daemon_is_running();
+        let (dmn_dot, dmn_color) = if daemon_on {
+            ("\u{25CF}", DOT_ON)
+        } else {
+            ("\u{25CB}", Color::Rgb(220, 180, 60)) // amber = warning
+        };
+        spans.push(Span::styled("daemon ", Style::default().fg(LABEL)));
+        spans.push(Span::styled(
+            format!("{dmn_dot} "),
+            Style::default().fg(dmn_color),
+        ));
 
         spans.push(sep());
 

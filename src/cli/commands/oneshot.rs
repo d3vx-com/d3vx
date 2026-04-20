@@ -77,6 +77,46 @@ async fn handle_auto_setup_if_needed() -> bool {
     }
 }
 
+/// Ensure the background daemon is running — auto-start it detached
+/// if not. Idempotent: silent no-op if the daemon is already up.
+///
+/// Why: without a daemon, vex tasks queued from the TUI freeze the
+/// moment the TUI exits (in-memory orchestrator dies with the
+/// process; SQLite records remain but no one dispatches them). The
+/// daemon is a separate OS process that owns the dispatch loop, so
+/// this closes the silent data-loss loophole where a user types
+/// `/vex "build X"`, quits, and comes back to a task that never ran.
+///
+/// Opt-out: `--no-daemon`. Intentionally not a config key — the
+/// desired default *is* "on", and the flag exists only for the
+/// transient "I'm just poking around" case.
+fn ensure_daemon_running() {
+    use crate::cli::commands::daemon::{
+        process_running, read_daemon_pid, start_daemon_detached,
+    };
+
+    // Already running → nothing to do, stay silent.
+    if let Ok(Some(pid)) = read_daemon_pid() {
+        if process_running(pid) {
+            return;
+        }
+    }
+
+    // Not running — attempt to spawn. We block on the async helper
+    // here because we're in the pre-TUI boot path where printing is
+    // still reasonable; the spawn itself is instantaneous (fork+exec).
+    let handle = tokio::runtime::Handle::current();
+    let spawn_result = handle.block_on(start_daemon_detached());
+    match spawn_result {
+        Ok(()) => {} // `start_daemon_detached` already prints its own line
+        Err(e) => {
+            eprintln!(
+                "  \x1b[33m! Daemon auto-start failed: {e}\x1b[0m\n  \x1b[90m  (background vex tasks will not survive TUI exit; run `d3vx daemon start --detach` manually)\x1b[0m"
+            );
+        }
+    }
+}
+
 /// Try to start the dashboard server.
 /// Returns Some(Dashboard) on success, None if it fails (non-fatal).
 fn try_start_dashboard() -> Option<Dashboard> {
@@ -151,6 +191,9 @@ pub(crate) async fn execute_oneshot(query: &str, cli: &Cli) -> Result<()> {
         }
     }
 
+    if !cli.no_daemon {
+        ensure_daemon_running();
+    }
     let dashboard = try_start_dashboard();
 
     let tui_opts = TuiOptions {
@@ -200,6 +243,9 @@ pub(crate) async fn execute_interactive(cli: &Cli) -> Result<()> {
         }
     }
 
+    if !cli.no_daemon {
+        ensure_daemon_running();
+    }
     let dashboard = try_start_dashboard();
 
     let tui_opts = TuiOptions {

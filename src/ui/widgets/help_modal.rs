@@ -115,33 +115,64 @@ impl Widget for HelpModal {
             ),
         ]));
 
-        let shortcuts = vec![
-            ("Enter", "Send message"),
-            ("\\ + Enter", "New line"),
-            ("↑ / ↓", "History navigation"),
-            ("Ctrl+C", "Cancel / Quit"),
-            ("Ctrl+1-4", "Switch right panel tab"),
-            ("Ctrl+L", "Toggle sidebar"),
-            ("Ctrl+O", "Toggle tools (selected agent)"),
-            ("Esc", "Dismiss modal / Stop agent"),
-            ("?", "Quick help"),
+        // Grouped by *where you'd use them* so a user can scan the
+        // block that matches their current context rather than
+        // memorise a flat list of 20 bindings.
+        let shortcut_groups: &[(&str, &[(&str, &str)])] = &[
+            (
+                "Chat",
+                &[
+                    ("Enter", "Send message"),
+                    ("\\ + Enter", "New line within a message"),
+                    ("↑ / ↓", "History (with prefix search)"),
+                    ("Esc", "Stop streaming / close modals / clear"),
+                    ("Ctrl+C", "Interrupt · press twice to quit"),
+                ],
+            ),
+            (
+                "Slash palette",
+                &[
+                    ("/", "Open the live command palette"),
+                    ("↑ / ↓", "Navigate palette while open"),
+                    ("Tab", "Complete the highlighted command"),
+                    ("Enter", "Accept and run the highlighted command"),
+                ],
+            ),
+            (
+                "Views",
+                &[
+                    ("Ctrl+1..4", "Switch right-panel tab"),
+                    ("Ctrl+L", "Toggle left sidebar"),
+                    ("Ctrl+W", "Toggle detail drawer"),
+                    ("Ctrl+O", "Expand/collapse selected tool output"),
+                    ("Ctrl+F", "Cycle focus mode"),
+                    ("?", "Quick help · Esc to close"),
+                ],
+            ),
         ];
 
-        for (key, desc) in shortcuts {
-            text.push(Line::from(vec![
-                Span::styled(
-                    format!("  {:>14} ", key),
-                    Style::default()
-                        .fg(self.theme.brand)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(desc, Style::default().fg(self.theme.ui.text_dim)),
-            ]));
+        for (group_title, bindings) in shortcut_groups {
+            text.push(Line::from(vec![Span::styled(
+                format!("  {}", group_title),
+                Style::default()
+                    .fg(self.theme.brand_secondary)
+                    .add_modifier(Modifier::BOLD),
+            )]));
+            for (key, desc) in *bindings {
+                text.push(Line::from(vec![
+                    Span::styled(
+                        format!("  {:>14} ", key),
+                        Style::default()
+                            .fg(self.theme.brand)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(*desc, Style::default().fg(self.theme.ui.text_dim)),
+                ]));
+            }
+            text.push(Line::raw(""));
         }
 
-        text.push(Line::from(""));
-
-        // 2. Slash Commands
+        // 2. Slash Commands — grouped by category
         text.push(Line::from(vec![
             Span::styled("─ Slash Commands ", Style::default().fg(self.theme.brand)),
             Span::styled(
@@ -150,23 +181,35 @@ impl Widget for HelpModal {
             ),
         ]));
 
-        use crate::app::slash_commands::SLASH_COMMANDS;
-        for cmd in SLASH_COMMANDS {
-            text.push(Line::from(vec![
-                Span::styled(
-                    format!("  /{:<10} ", cmd.name),
-                    Style::default()
-                        .fg(self.theme.brand_secondary)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(cmd.description, Style::default().fg(self.theme.ui.text_dim)),
-            ]));
+        use crate::app::slash_commands::{CATEGORY_ORDER, SLASH_COMMANDS};
+        for category in CATEGORY_ORDER {
+            let matching: Vec<_> = SLASH_COMMANDS
+                .iter()
+                .filter(|c| c.category == *category)
+                .collect();
+            if matching.is_empty() {
+                continue;
+            }
+
             text.push(Line::from(vec![Span::styled(
-                format!("               usage: {}", cmd.usage),
+                format!("  {}", category),
                 Style::default()
-                    .fg(self.theme.ui.text_muted)
-                    .add_modifier(Modifier::ITALIC),
+                    .fg(self.theme.brand_secondary)
+                    .add_modifier(Modifier::BOLD),
             )]));
+
+            for cmd in matching {
+                text.push(Line::from(vec![
+                    Span::styled(
+                        format!("  /{:<11} ", cmd.name),
+                        Style::default()
+                            .fg(self.theme.brand)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(cmd.description, Style::default().fg(self.theme.ui.text_dim)),
+                ]));
+            }
+            text.push(Line::raw(""));
         }
 
         text.push(Line::from(""));

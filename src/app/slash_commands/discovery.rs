@@ -20,6 +20,20 @@ use crate::app::state::NotificationType;
 use crate::app::App;
 use crate::utils::open_url::open_url;
 
+/// True if the background daemon is currently running — checks pidfile
+/// + signals the pid with 0 to confirm the process actually exists.
+///
+/// Lives here rather than on `App` because the daemon's existence is
+/// process-level state, not UI state; the filesystem is the source of
+/// truth. Cheap enough to call every render tick for the status strip.
+pub fn daemon_is_running() -> bool {
+    use crate::cli::commands::daemon::{process_running, read_daemon_pid};
+    match read_daemon_pid() {
+        Ok(Some(pid)) => process_running(pid),
+        _ => false,
+    }
+}
+
 /// `/dashboard` — print the dashboard URL and open it in the browser.
 ///
 /// If no dashboard is running (`--no-dashboard`, daemon-only launch),
@@ -119,8 +133,25 @@ fn format_daemon_json(pid: i32, v: &serde_json::Value) -> String {
 /// user can discover this by typing `/vex` with no args and seeing
 /// the usage hint.
 pub fn handle_vex_list(app: &mut App) -> Result<()> {
+    // Refresh from the orchestrator on demand. The background poll
+    // runs every 500ms, so the cached list is usually fresh — but a
+    // user typing `/vex list` right after `/vex <task>` expects to
+    // see the task *now*, not in half a second.
+    app.background_active_tasks = tokio::task::block_in_place(|| {
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(app.orchestrator.active_tasks_list())
+    });
+
     if app.background_active_tasks.is_empty() {
-        app.add_system_message("No background tasks running. Start one with `/vex <description>`.");
+        if daemon_is_running() {
+            app.add_system_message(
+                "No background tasks running. Start one with `/vex <description>`.",
+            );
+        } else {
+            app.add_system_message(
+                "No background tasks running — and the daemon is offline. Start it with `d3vx daemon start --detach`, then `/vex <description>`.",
+            );
+        }
         return Ok(());
     }
 
@@ -131,6 +162,11 @@ pub fn handle_vex_list(app: &mut App) -> Result<()> {
     for (id, name) in &app.background_active_tasks {
         let short_id = if id.len() >= 8 { &id[..8] } else { id.as_str() };
         out.push_str(&format!("  [{short_id}] {name}\n"));
+    }
+    if !daemon_is_running() {
+        out.push_str(
+            "\n⚠ Daemon is not running — these tasks are queued but idle.\n  Start: d3vx daemon start --detach",
+        );
     }
     app.add_system_message(&out);
     Ok(())
