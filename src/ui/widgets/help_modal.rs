@@ -118,6 +118,13 @@ impl Widget for HelpModal {
         // Grouped by *where you'd use them* so a user can scan the
         // block that matches their current context rather than
         // memorise a flat list of 20 bindings.
+        //
+        // NOTE: this table is the canonical keybinding documentation.
+        // When adding or changing a handler in
+        // `src/app/handlers/keyboard/`, update the matching row here.
+        // The previous Ctrl+L drift ("Toggle left sidebar" in help,
+        // right-sidebar in code) shipped because these two lived in
+        // different files with no enforcement.
         let shortcut_groups: &[(&str, &[(&str, &str)])] = &[
             (
                 "Chat",
@@ -125,8 +132,11 @@ impl Widget for HelpModal {
                     ("Enter", "Send message"),
                     ("\\ + Enter", "New line within a message"),
                     ("↑ / ↓", "History (with prefix search)"),
-                    ("Esc", "Stop streaming / close modals / clear"),
+                    ("Esc", "Stop streaming · close modal · dismiss welcome"),
+                    ("Esc Esc", "Double-tap: open undo picker"),
                     ("Ctrl+C", "Interrupt · press twice to quit"),
+                    ("Ctrl+U", "Clear input line"),
+                    ("Ctrl+X", "Pop last message from queue"),
                 ],
             ),
             (
@@ -139,14 +149,47 @@ impl Widget for HelpModal {
                 ],
             ),
             (
-                "Views",
+                "Views & layout",
                 &[
                     ("Ctrl+1..4", "Switch right-panel tab"),
                     ("Ctrl+L / Ctrl+R", "Toggle right sidebar"),
+                    ("Ctrl+N", "Focus the sidebar / navigator"),
                     ("Ctrl+W", "Toggle detail drawer"),
-                    ("Ctrl+O", "Expand/collapse selected tool output"),
-                    ("Ctrl+F", "Cycle focus mode"),
+                    ("Ctrl+O", "Expand/collapse tool output"),
+                    ("Ctrl+A", "Pin agent monitor to the sidebar"),
+                    ("Ctrl+S", "Toggle agent-strip expanded view"),
+                    ("Ctrl+P", "Toggle Power Mode"),
                     ("?", "Quick help · Esc to close"),
+                ],
+            ),
+            (
+                "Agents & workspaces",
+                &[
+                    ("Ctrl+↑ / ↓", "Navigate inline agents"),
+                    ("Ctrl+E", "Select highlighted agent"),
+                    ("Alt+← / →", "Switch workspace"),
+                    ("Alt+PgUp / PgDn", "Scroll selected agent transcript"),
+                    ("Ctrl+F", "Cycle focus mode (chat → build → plan …)"),
+                ],
+            ),
+            (
+                "Diff preview",
+                &[
+                    ("Ctrl+D", "Toggle full-screen diff view"),
+                    ("Ctrl+← / →", "Cycle changed files"),
+                    ("Esc / q", "Close diff"),
+                ],
+            ),
+            (
+                "Board / list",
+                &[
+                    ("j / k or ↑ / ↓", "Move selection up / down"),
+                    ("h / l or ← / →", "Move selection left / right (board)"),
+                    ("H / L", "Move task between columns (board)"),
+                    ("a", "Quick-add task in Inbox column (board)"),
+                    ("Space", "Toggle task done (list)"),
+                    ("Enter", "Open selected task / switch workspace"),
+                    ("Esc / q", "Return to chat"),
                 ],
             ),
         ];
@@ -211,6 +254,44 @@ impl Widget for HelpModal {
             }
             text.push(Line::raw(""));
         }
+
+        // 3. CLI flags — set when launching `d3vx`, not inside the TUI.
+        // Users reading this while running `cargo run --` need to know
+        // what the flags do and that restarting is required to apply
+        // them.
+        text.push(Line::from(vec![
+            Span::styled("─ CLI flags (at launch) ", Style::default().fg(self.theme.brand)),
+            Span::styled(
+                "──────────────────────",
+                Style::default().fg(self.theme.ui.border),
+            ),
+        ]));
+        let cli_flags: &[(&str, &str)] = &[
+            ("--vex \"<task>\"", "Run the task in an isolated git worktree; daemon owns it"),
+            ("--parallel-agents", "Enable parallel sub-agent orchestration"),
+            ("--trust", "Auto-approve every tool (skip permission prompts)"),
+            ("--bypass-permissions", "Skip all permission checks (superset of --trust)"),
+            ("--no-daemon", "Don't auto-start the background daemon"),
+            ("--no-stream", "Buffer the full response instead of streaming"),
+            ("--verbose", "Enable debug-level tracing"),
+            ("--resume", "Open the session picker on launch"),
+            ("--continue", "Auto-resume the most recent session"),
+            ("--ui <mode>", "Start in chat / kanban / list view"),
+            ("--model <name>", "Pick a model for this run (or D3VX_MODEL env)"),
+            ("--provider <name>", "Pick a provider (anthropic / openai / groq / ...)"),
+        ];
+        for (flag, desc) in cli_flags {
+            text.push(Line::from(vec![
+                Span::styled(
+                    format!("  {:<22} ", flag),
+                    Style::default()
+                        .fg(self.theme.brand)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(*desc, Style::default().fg(self.theme.ui.text_dim)),
+            ]));
+        }
+        text.push(Line::raw(""));
 
         text.push(Line::from(""));
         text.push(Line::from(vec![Span::styled(

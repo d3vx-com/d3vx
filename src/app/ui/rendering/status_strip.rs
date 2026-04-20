@@ -79,6 +79,21 @@ impl App {
             Style::default().fg(VALUE).add_modifier(Modifier::BOLD),
         ));
 
+        // Focus-mode suffix — only rendered when the user has *left*
+        // the default (Chat) focus. Showing `[chat]` next to the `chat`
+        // AppMode would duplicate information and crowd the strip;
+        // showing `[build]` / `[plan]` etc. tells the user they're on
+        // a non-default focus without requiring them to open /help.
+        let focus = self.ui.focus_mode;
+        if focus != crate::app::state::FocusMode::Chat {
+            spans.push(Span::styled(
+                format!(" [{}]", focus.label().to_lowercase()),
+                Style::default()
+                    .fg(self.ui.theme.brand_secondary)
+                    .add_modifier(Modifier::BOLD),
+            ));
+        }
+
         // Exit hint when in a mode that takes over the main area.
         // Without this, users who typed `/board` or `/list` get stuck
         // in the view with no visible way back — Esc works but is
