@@ -115,6 +115,11 @@ pub struct UIState {
     pub command_palette_filter: String,
     /// Command palette selected index
     pub command_palette_selected: usize,
+    /// Live slash-palette selection (the inline autocomplete shown while
+    /// the input buffer starts with `/` and has no whitespace yet).
+    /// Visibility is derived from the input buffer; this only holds the
+    /// highlighted row.
+    pub slash_palette_selected: usize,
 
     // ════════════════════════════════════════════════════════════════════════════
     // Layout Tracking for Mouse
@@ -227,6 +232,7 @@ impl Default for UIState {
 
             command_palette_filter: String::new(),
             command_palette_selected: 0,
+            slash_palette_selected: 0,
 
             last_left_sidebar_rect: ratatui::layout::Rect::default(),
             last_right_sidebar_rect: ratatui::layout::Rect::default(),

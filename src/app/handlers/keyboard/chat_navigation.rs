@@ -56,6 +56,14 @@ impl App {
                 if self.accept_selected_mention()? {
                     return Ok(());
                 }
+                // If the slash-palette is open, Enter means "accept the
+                // highlighted command, then run it." Without this, Enter
+                // would send the bare `/` and a user who just hit Enter
+                // on the visible highlight would get nothing (or a
+                // panic, pre-fix) instead of the obvious thing.
+                if self.is_slash_palette_open() {
+                    self.slash_palette_accept();
+                }
                 // Expand paste preview into actual content before sending
                 let input = self.expand_paste_content();
                 self.ui.show_welcome = false; // Dismiss welcome on enter
@@ -76,12 +84,20 @@ impl App {
 
             // Tab Completion
             (KeyCode::Tab, KeyModifiers::NONE) => {
+                if self.is_slash_palette_open() {
+                    self.slash_palette_accept();
+                    return Ok(());
+                }
                 if self.select_next_mention(false) {
                     return Ok(());
                 }
                 self.handle_tab_completion(false)?;
             }
             (KeyCode::BackTab, _) | (KeyCode::Tab, KeyModifiers::SHIFT) => {
+                if self.is_slash_palette_open() {
+                    self.slash_palette_accept();
+                    return Ok(());
+                }
                 if self.select_next_mention(true) {
                     return Ok(());
                 }
@@ -165,11 +181,16 @@ impl App {
                 self.ui.input_buffer.insert(self.ui.cursor_position, c);
                 self.ui.cursor_position += 1;
                 self.ui.history_prefix = None; // Reset search on typing
+                self.ui.slash_palette_selected = 0; // Reset palette selection on typing
                 self.refresh_mention_picker()?;
             }
 
             // History Navigation with Prefix Search
             (KeyCode::Up, KeyModifiers::NONE) => {
+                if self.is_slash_palette_open() {
+                    self.slash_palette_select_prev();
+                    return Ok(());
+                }
                 if self.select_prev_mention() {
                     return Ok(());
                 }
@@ -199,6 +220,10 @@ impl App {
                 }
             }
             (KeyCode::Down, KeyModifiers::NONE) => {
+                if self.is_slash_palette_open() {
+                    self.slash_palette_select_next();
+                    return Ok(());
+                }
                 if self.select_next_mention(false) {
                     return Ok(());
                 }

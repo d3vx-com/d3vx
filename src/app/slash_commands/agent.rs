@@ -6,8 +6,14 @@ use super::*;
 
 pub fn handle_vex(app: &mut App, args: &[&str]) -> Result<()> {
     if args.is_empty() {
-        app.add_system_message("Usage: /vex [task description]");
+        app.add_system_message(
+            "Usage: /vex <task description>\n       /vex list  — show running background tasks",
+        );
         return Ok(());
+    }
+
+    if args[0].eq_ignore_ascii_case("list") {
+        return super::discovery::handle_vex_list(app);
     }
 
     let description = args.join(" ");

@@ -144,6 +144,9 @@ impl App {
         // Input area (always 3 rows)
         constraints.push(Constraint::Length(3));
 
+        // Discovery strip (always 1 row, pinned to the very bottom)
+        constraints.push(Constraint::Length(1));
+
         let main_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints(constraints)
@@ -171,6 +174,8 @@ impl App {
         };
 
         let input_area = main_chunks[idx];
+        idx += 1;
+        let discovery_area = main_chunks[idx];
 
         // Store rects for mouse hit-testing
         self.layout.last_left_sidebar_rect = Rect::default();
@@ -237,8 +242,13 @@ impl App {
         // Render input
         self.render_input(f, input_area);
 
+        // Render the persistent discovery strip beneath the input
+        self.render_discovery_strip(f, discovery_area);
+
         if !self.ui.mention_suggestions.is_empty() {
             self.render_mention_picker(f, size, input_area);
+        } else if self.is_slash_palette_open() {
+            self.render_slash_palette(f, input_area);
         }
 
         // Render unified sidebar for Board/List modes only

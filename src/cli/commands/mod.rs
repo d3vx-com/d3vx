@@ -4,7 +4,7 @@
 //! It maps CLI arguments to their respective handlers.
 
 mod config_cmd;
-mod daemon;
+pub(crate) mod daemon;
 mod doctor;
 pub mod error;
 mod helpers;

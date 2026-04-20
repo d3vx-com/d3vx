@@ -11,6 +11,7 @@
 
 mod agent;
 mod core;
+mod discovery;
 mod modes;
 mod navigation;
 mod session;
@@ -25,6 +26,7 @@ use super::{App, AppMode};
 // Re-export all handler functions for use in the command registry
 pub use agent::{handle_compact, handle_spawn, handle_thinking, handle_vex};
 pub use core::{handle_clear, handle_cost, handle_quit, handle_status, show_help};
+pub use discovery::{handle_daemon, handle_dashboard};
 pub use modes::{
     handle_mode, handle_model, handle_plan, handle_power, handle_verbose, handle_vibe,
 };
@@ -167,9 +169,22 @@ pub const SLASH_COMMANDS: &[SlashCommand] = &[
     // Agent
     SlashCommand {
         name: "vex",
-        description: "Start a background task in an isolated worktree",
-        usage: "/vex [task description]",
+        description: "Run a task in an isolated worktree (or `/vex list`)",
+        usage: "/vex [list | task description]",
         handler: handle_vex,
+    },
+    // Discovery
+    SlashCommand {
+        name: "dashboard",
+        description: "Open the live dashboard in your browser",
+        usage: "/dashboard",
+        handler: handle_dashboard,
+    },
+    SlashCommand {
+        name: "daemon",
+        description: "Show background daemon status",
+        usage: "/daemon",
+        handler: handle_daemon,
     },
     // Tools
     SlashCommand {
@@ -252,10 +267,24 @@ pub fn try_execute_slash_command(app: &mut App, input: &str) -> Result<bool> {
         return Ok(false);
     }
 
-    // Parse command name and args
+    // Parse command name and args.
+    //
+    // `trimmed[1..]` is safe here — we've already verified the string
+    // starts with `/`, so there's at least one byte to skip. But
+    // `split_whitespace()` can yield zero tokens (bare `/` or `/   `),
+    // so we must not blindly slice `parts[1..]` — that's what produced
+    // the earlier "range start index 1 out of range" panic when a user
+    // hit Enter on an empty slash prompt.
     let parts: Vec<&str> = trimmed[1..].split_whitespace().collect();
     let cmd_name = parts.first().copied().unwrap_or("");
-    let args = &parts[1..];
+    let args: &[&str] = if parts.len() > 1 { &parts[1..] } else { &[] };
+
+    // Bare `/` — treat as a no-op rather than an "Unknown command"
+    // notification. The palette already showed the user their options;
+    // no point echoing an error at them for closing it empty.
+    if cmd_name.is_empty() {
+        return Ok(true);
+    }
 
     // Find matching command
     for cmd in SLASH_COMMANDS {

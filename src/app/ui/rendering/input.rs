@@ -98,15 +98,60 @@ impl App {
             }
         }
 
-        // ── Hint strip: mode description + Ctrl+Tab ──
-
-        let hint_line = Line::from(vec![
-            Span::styled(
-                format!(" {} ", mode.hint()),
-                Style::default().fg(Color::Rgb(70, 70, 82)),
-            ),
-            Span::styled("Ctrl+F cycle", Style::default().fg(Color::Rgb(45, 45, 55))),
-        ]);
+        // ── Hint strip ──
+        //
+        // Empty prompt → show the top 4 slash commands inline so a new
+        // user learns the surface exists. Once they start typing the
+        // hint reverts to the focus-mode description so it doesn't
+        // compete with the prompt content.
+        let hint_line = if self.ui.input_buffer.is_empty() {
+            Line::from(vec![
+                Span::styled(" \u{203A} ", Style::default().fg(Color::Rgb(90, 90, 105))),
+                Span::styled(
+                    "/board",
+                    Style::default()
+                        .fg(self.ui.theme.brand)
+                        .add_modifier(Modifier::DIM),
+                ),
+                Span::styled(" kanban  ", Style::default().fg(Color::Rgb(70, 70, 82))),
+                Span::styled(
+                    "/list",
+                    Style::default()
+                        .fg(self.ui.theme.brand)
+                        .add_modifier(Modifier::DIM),
+                ),
+                Span::styled(" tasks  ", Style::default().fg(Color::Rgb(70, 70, 82))),
+                Span::styled(
+                    "/dashboard",
+                    Style::default()
+                        .fg(self.ui.theme.brand)
+                        .add_modifier(Modifier::DIM),
+                ),
+                Span::styled(" web  ", Style::default().fg(Color::Rgb(70, 70, 82))),
+                Span::styled(
+                    "/vex",
+                    Style::default()
+                        .fg(self.ui.theme.brand)
+                        .add_modifier(Modifier::DIM),
+                ),
+                Span::styled(" bg  ", Style::default().fg(Color::Rgb(70, 70, 82))),
+                Span::styled(
+                    "?",
+                    Style::default()
+                        .fg(self.ui.theme.brand_secondary)
+                        .add_modifier(Modifier::DIM),
+                ),
+                Span::styled(" all", Style::default().fg(Color::Rgb(70, 70, 82))),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled(
+                    format!(" {} ", mode.hint()),
+                    Style::default().fg(Color::Rgb(70, 70, 82)),
+                ),
+                Span::styled("Ctrl+F cycle", Style::default().fg(Color::Rgb(45, 45, 55))),
+            ])
+        };
 
         // Render
         self.layout.last_mode_bar_rect = Some(hint_area);

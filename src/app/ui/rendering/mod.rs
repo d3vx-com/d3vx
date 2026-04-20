@@ -36,5 +36,9 @@ mod main_render;
 mod mention_picker;
 mod messages;
 mod sidebar;
+mod slash_palette;
+#[cfg(test)]
+mod slash_palette_tests;
+mod status_strip;
 mod task_list;
 mod welcome;
