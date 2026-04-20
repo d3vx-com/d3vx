@@ -16,6 +16,7 @@ pub mod mcp;
 pub mod metrics;
 pub mod notifications;
 pub mod pipeline;
+pub mod planner;
 pub mod plugin;
 pub mod providers;
 pub mod recovery;
