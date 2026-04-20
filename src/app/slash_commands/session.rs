@@ -52,7 +52,7 @@ pub fn handle_resume(app: &mut App, args: &[&str]) -> Result<()> {
         }
 
         app.session_picker = Some(crate::ui::widgets::SessionPicker::new(sessions));
-        app.ui.mode = AppMode::SessionPicker;
+        app.ui.enter_overlay_mode(AppMode::SessionPicker);
     }
     Ok(())
 }

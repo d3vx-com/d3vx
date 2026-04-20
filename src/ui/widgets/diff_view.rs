@@ -161,6 +161,13 @@ impl DiffView {
 
         let block = Block::default()
             .title(format!(" Diff: {} ", self.file_path))
+            // Right-aligned dismissal hint — prevents the "I opened this,
+            // now how do I close it?" UX dead end for first-time users.
+            .title_top(
+                ratatui::text::Line::from(" Esc · Ctrl+D to close ")
+                    .style(Style::default().fg(theme.ui.text_dim))
+                    .right_aligned(),
+            )
             .title_style(
                 Style::default()
                     .fg(theme.brand)

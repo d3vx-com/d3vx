@@ -142,7 +142,7 @@ impl Widget for HelpModal {
                 "Views",
                 &[
                     ("Ctrl+1..4", "Switch right-panel tab"),
-                    ("Ctrl+L", "Toggle left sidebar"),
+                    ("Ctrl+L / Ctrl+R", "Toggle right sidebar"),
                     ("Ctrl+W", "Toggle detail drawer"),
                     ("Ctrl+O", "Expand/collapse selected tool output"),
                     ("Ctrl+F", "Cycle focus mode"),

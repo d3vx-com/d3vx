@@ -171,11 +171,11 @@ impl App {
                     self.diff_view = self.diff_preview.clone();
                 }
                 if self.diff_view.is_some() {
-                    self.ui.mode = if self.ui.mode == AppMode::DiffPreview {
-                        AppMode::Chat
+                    if self.ui.mode == AppMode::DiffPreview {
+                        self.ui.exit_overlay_mode();
                     } else {
-                        AppMode::DiffPreview
-                    };
+                        self.ui.enter_overlay_mode(AppMode::DiffPreview);
+                    }
                 }
             }
 

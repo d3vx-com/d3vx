@@ -44,7 +44,7 @@ impl App {
                                 .unwrap_or_else(|| "unknown".to_string());
                             self.diff_view =
                                 Some(crate::ui::widgets::DiffView::new(&file_path, diff_content));
-                            self.ui.mode = AppMode::DiffPreview;
+                            self.ui.enter_overlay_mode(AppMode::DiffPreview);
                         }
                     }
                 }

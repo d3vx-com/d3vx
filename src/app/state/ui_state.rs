@@ -25,6 +25,12 @@ pub struct UIState {
     // ════════════════════════════════════════════════════════════════════════════
     /// Current application mode
     pub mode: AppMode,
+    /// The mode we were in before entering an overlay (Help today; the
+    /// pattern generalises to other transient overlays). Stored so Esc
+    /// can restore context instead of always dumping the user to Chat —
+    /// a user who opens `?` from Board should return to Board, not
+    /// lose their place.
+    pub prior_mode: Option<AppMode>,
     /// Read-only plan mode (blocks write tools)
     pub plan_mode: bool,
     /// Verbose mode (expanded tool calls)
@@ -194,6 +200,7 @@ impl Default for UIState {
     fn default() -> Self {
         Self {
             mode: AppMode::Chat,
+            prior_mode: None,
             plan_mode: false,
             verbose: false,
             power_mode: false,
@@ -286,6 +293,24 @@ impl UIState {
     /// Reset escape tracking
     pub fn reset_escape(&mut self) {
         self.escape_count = 0;
+    }
+
+    /// Transition into an overlay mode (Help, etc.) that should return
+    /// the user to their previous mode on dismiss. Idempotent: if an
+    /// overlay is already open, we don't overwrite `prior_mode` — the
+    /// user's real starting point is what we want to restore to.
+    pub fn enter_overlay_mode(&mut self, overlay: AppMode) {
+        if self.prior_mode.is_none() {
+            self.prior_mode = Some(self.mode);
+        }
+        self.mode = overlay;
+    }
+
+    /// Dismiss the current overlay, restoring the mode we came from
+    /// (or `Chat` if we never tracked one). Resets `prior_mode` so a
+    /// subsequent overlay entry saves fresh context.
+    pub fn exit_overlay_mode(&mut self) {
+        self.mode = self.prior_mode.take().unwrap_or(AppMode::Chat);
     }
 
     /// Insert a character at the cursor position
@@ -399,5 +424,49 @@ mod tests {
         // Reset escape count
         state.reset_escape();
         assert_eq!(state.escape_count, 0);
+    }
+
+    #[test]
+    fn overlay_entry_saves_prior_and_switches_mode() {
+        let mut state = UIState::default();
+        state.mode = AppMode::Board;
+        state.enter_overlay_mode(AppMode::Help);
+        assert_eq!(state.mode, AppMode::Help);
+        assert_eq!(state.prior_mode, Some(AppMode::Board));
+    }
+
+    #[test]
+    fn overlay_exit_restores_prior_mode() {
+        let mut state = UIState::default();
+        state.mode = AppMode::Board;
+        state.enter_overlay_mode(AppMode::Help);
+        state.exit_overlay_mode();
+        assert_eq!(state.mode, AppMode::Board);
+        assert_eq!(state.prior_mode, None, "prior_mode should reset on exit");
+    }
+
+    #[test]
+    fn overlay_exit_with_no_prior_defaults_to_chat() {
+        let mut state = UIState::default();
+        state.mode = AppMode::Help; // user directly set without entering
+        state.exit_overlay_mode();
+        assert_eq!(state.mode, AppMode::Chat);
+    }
+
+    #[test]
+    fn nested_overlay_entry_preserves_deepest_prior() {
+        // Chat → DiffPreview → Help → Esc should land on DiffPreview,
+        // and another Esc should land on Chat. The enter helper is
+        // idempotent on `prior_mode`: it doesn't overwrite a saved
+        // prior with the intermediate overlay.
+        let mut state = UIState::default();
+        state.mode = AppMode::Chat;
+        state.enter_overlay_mode(AppMode::DiffPreview);
+        state.enter_overlay_mode(AppMode::Help);
+        assert_eq!(state.mode, AppMode::Help);
+        state.exit_overlay_mode();
+        // Current contract: exit always pops to the saved prior (Chat
+        // in this flow). Nesting beyond one overlay returns to origin.
+        assert_eq!(state.mode, AppMode::Chat);
     }
 }

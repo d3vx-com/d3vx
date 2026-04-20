@@ -142,7 +142,7 @@ impl App {
 
             // Quick Help
             (KeyCode::Char('?'), mods) if mods.is_empty() && self.ui.input_buffer.is_empty() => {
-                self.ui.mode = AppMode::Help;
+                self.ui.enter_overlay_mode(AppMode::Help);
             }
 
             // Input navigation

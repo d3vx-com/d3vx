@@ -36,9 +36,13 @@ pub fn handle_plans(app: &mut App, _args: &[&str]) -> Result<()> {
     let dir = plans_dir(app);
     let plans = match list_plans(&dir) {
         Ok(p) => p,
-        Err(e) => {
+        Err(_) => {
+            // Missing directory is the common case before any planner
+            // work has happened here. Don't blame the user for it.
             app.add_system_message(&format!(
-                "No plans directory at {} ({e}). Run a task via `/plan <request>` to create one.",
+                "No plans yet for this project ({} doesn't exist). Plan files are markdown \
+                 checkboxes stored under `.d3vx/plans/` — the planner writes one whenever a \
+                 task needs multi-phase work.",
                 dir.display()
             ));
             return Ok(());
@@ -47,7 +51,8 @@ pub fn handle_plans(app: &mut App, _args: &[&str]) -> Result<()> {
 
     if plans.is_empty() {
         app.add_system_message(&format!(
-            "No plans yet. Plans live in {} and are created by the planner.",
+            "No plans yet in {}. Plan files are markdown checkboxes written by the planner \
+             when a task needs multi-phase work (research → plan → implement etc.).",
             dir.display()
         ));
         return Ok(());
