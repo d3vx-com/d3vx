@@ -100,11 +100,45 @@ impl App {
 
         // ── Hint strip ──
         //
-        // Empty prompt → show the top 4 slash commands inline so a new
-        // user learns the surface exists. Once they start typing the
-        // hint reverts to the focus-mode description so it doesn't
-        // compete with the prompt content.
-        let hint_line = if self.ui.input_buffer.is_empty() {
+        // Three-way choice:
+        //  1. Setup-needed → a single high-signal call-to-action.
+        //     Overrides normal hints — this is the only thing that
+        //     matters until the user runs /setup.
+        //  2. Empty prompt → the four most useful slash commands so
+        //     a new user discovers the surface.
+        //  3. Typing → focus-mode hint + Ctrl+F cue, same as before.
+        let hint_line = if !self.agents.is_connected && self.ui.input_buffer.is_empty() {
+            Line::from(vec![
+                Span::styled(
+                    " \u{26A0} ",
+                    Style::default().fg(Color::Rgb(220, 180, 60)),
+                ),
+                Span::styled(
+                    "No agent — type ",
+                    Style::default().fg(Color::Rgb(150, 150, 165)),
+                ),
+                Span::styled(
+                    "/setup",
+                    Style::default()
+                        .fg(self.ui.theme.brand)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    " to configure, ",
+                    Style::default().fg(Color::Rgb(150, 150, 165)),
+                ),
+                Span::styled(
+                    "/doctor",
+                    Style::default()
+                        .fg(self.ui.theme.brand)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    " to diagnose.",
+                    Style::default().fg(Color::Rgb(150, 150, 165)),
+                ),
+            ])
+        } else if self.ui.input_buffer.is_empty() {
             Line::from(vec![
                 Span::styled(" \u{203A} ", Style::default().fg(Color::Rgb(90, 90, 105))),
                 Span::styled(

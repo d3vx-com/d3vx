@@ -66,6 +66,24 @@ impl App {
                 }
                 // Expand paste preview into actual content before sending
                 let input = self.expand_paste_content();
+
+                // Setup-required gate: if the agent isn't connected,
+                // normal messages go into the void. Let slash commands
+                // (`/setup`, `/doctor`, `/quit`) and bash prefix (`!`)
+                // through — those don't need an agent and are the
+                // *recovery path* out of this state. Block anything
+                // else with a system message that explains the state
+                // without making the UI look broken.
+                if self.should_block_message_send(&input) {
+                    self.add_system_message(
+                        "No agent is running — this message wasn't sent. Type `/setup` to configure an API key, `/doctor` to diagnose, or `/quit` to exit.",
+                    );
+                    self.ui.input_buffer.clear();
+                    self.ui.cursor_position = 0;
+                    self.clear_mention_picker();
+                    return Ok(());
+                }
+
                 self.ui.show_welcome = false; // Dismiss welcome on enter
                 self.ui.input_history.push(input.clone());
                 self.ui.input_buffer.clear();
@@ -298,6 +316,13 @@ impl App {
     /// If there's a pending paste, replaces the `[Pasted ~N lines...]` marker
     /// in the input buffer with the actual pasted content. Clears the pending
     /// state after expansion.
+    /// True if Enter should intercept this input instead of sending it.
+    /// Thin wrapper around [`should_block_message_send_inner`] so the
+    /// pure logic is testable without building a full App.
+    fn should_block_message_send(&self, input: &str) -> bool {
+        should_block_message_send_inner(self.agents.is_connected, input)
+    }
+
     fn expand_paste_content(&mut self) -> String {
         let input = self.ui.input_buffer.clone();
 
@@ -315,6 +340,25 @@ impl App {
             input
         }
     }
+}
+
+/// Pure form of the Enter-time setup gate. See the `impl App` wrapper
+/// [`App::should_block_message_send`] for the product-facing contract.
+///
+/// Intercepts only when (1) the agent isn't connected, AND (2) the
+/// input isn't a slash / bash command — both of which need to work in
+/// setup-required state because they're the user's recovery path.
+/// Empty / whitespace-only input is allowed through (the pre-existing
+/// no-op on the agent side absorbs it).
+fn should_block_message_send_inner(agent_connected: bool, input: &str) -> bool {
+    if agent_connected {
+        return false;
+    }
+    let trimmed = input.trim_start();
+    if trimmed.is_empty() {
+        return false;
+    }
+    !matches!(trimmed.chars().next(), Some('/') | Some('!'))
 }
 
 /// Format a paste preview string for display in the input buffer.
@@ -389,5 +433,47 @@ mod tests {
             buffer
         };
         assert_eq!(result, format!("explain this: {}", actual));
+    }
+
+    // ── Setup gate (#14) ──
+
+    #[test]
+    fn setup_gate_allows_everything_when_agent_connected() {
+        assert!(!should_block_message_send_inner(true, "fix this bug"));
+        assert!(!should_block_message_send_inner(true, "/setup"));
+        assert!(!should_block_message_send_inner(true, ""));
+    }
+
+    #[test]
+    fn setup_gate_blocks_normal_message_when_disconnected() {
+        assert!(should_block_message_send_inner(false, "fix this bug"));
+    }
+
+    #[test]
+    fn setup_gate_allows_slash_commands_when_disconnected() {
+        // The recovery path: /setup / /doctor / /quit all work even
+        // when the agent is missing — that's how the user gets out.
+        assert!(!should_block_message_send_inner(false, "/setup"));
+        assert!(!should_block_message_send_inner(false, "/doctor"));
+        assert!(!should_block_message_send_inner(false, "/quit"));
+    }
+
+    #[test]
+    fn setup_gate_allows_bash_prefix_when_disconnected() {
+        assert!(!should_block_message_send_inner(false, "!ls -la"));
+    }
+
+    #[test]
+    fn setup_gate_allows_empty_input_when_disconnected() {
+        // Empty Enter is a pre-existing no-op; don't nag the user
+        // with an error message for it.
+        assert!(!should_block_message_send_inner(false, ""));
+        assert!(!should_block_message_send_inner(false, "   "));
+    }
+
+    #[test]
+    fn setup_gate_ignores_leading_whitespace_when_classifying() {
+        assert!(!should_block_message_send_inner(false, "  /setup"));
+        assert!(should_block_message_send_inner(false, "  hello agent"));
     }
 }
