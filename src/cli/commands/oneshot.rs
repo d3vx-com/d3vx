@@ -90,7 +90,7 @@ async fn handle_auto_setup_if_needed() -> bool {
 /// Opt-out: `--no-daemon`. Intentionally not a config key — the
 /// desired default *is* "on", and the flag exists only for the
 /// transient "I'm just poking around" case.
-fn ensure_daemon_running() {
+async fn ensure_daemon_running() {
     use crate::cli::commands::daemon::{
         process_running, read_daemon_pid, start_daemon_detached,
     };
@@ -102,12 +102,12 @@ fn ensure_daemon_running() {
         }
     }
 
-    // Not running — attempt to spawn. We block on the async helper
-    // here because we're in the pre-TUI boot path where printing is
-    // still reasonable; the spawn itself is instantaneous (fork+exec).
-    let handle = tokio::runtime::Handle::current();
-    let spawn_result = handle.block_on(start_daemon_detached());
-    match spawn_result {
+    // Not running — attempt to spawn. This is async because the
+    // underlying helper is async-signatured (though the body just
+    // spawns an OS child); we await it directly rather than using
+    // `Handle::current().block_on(...)`, which would panic from
+    // inside the tokio runtime that the caller is already on.
+    match start_daemon_detached().await {
         Ok(()) => {} // `start_daemon_detached` already prints its own line
         Err(e) => {
             eprintln!(
@@ -192,7 +192,7 @@ pub(crate) async fn execute_oneshot(query: &str, cli: &Cli) -> Result<()> {
     }
 
     if !cli.no_daemon {
-        ensure_daemon_running();
+        ensure_daemon_running().await;
     }
     let dashboard = try_start_dashboard();
 
@@ -244,7 +244,7 @@ pub(crate) async fn execute_interactive(cli: &Cli) -> Result<()> {
     }
 
     if !cli.no_daemon {
-        ensure_daemon_running();
+        ensure_daemon_running().await;
     }
     let dashboard = try_start_dashboard();
 
