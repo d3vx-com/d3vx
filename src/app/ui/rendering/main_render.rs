@@ -200,6 +200,13 @@ impl App {
             };
 
             let messages = self.render_messages(chat_inner_area);
+            // Clear before rendering so shrinking content (e.g. collapsing
+            // tool-call expansions via Ctrl+O) doesn't leave stale cells
+            // in rows the Paragraph no longer fills. Paragraph only
+            // writes to cells it has content for; anything past its tail
+            // stays whatever was there on the previous frame without
+            // this explicit clear.
+            f.render_widget(ratatui::widgets::Clear, chat_inner_area);
             f.render_widget(messages, chat_inner_area);
         }
 
