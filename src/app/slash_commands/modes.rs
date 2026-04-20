@@ -83,6 +83,15 @@ pub fn handle_mode(app: &mut App, args: &[&str]) -> Result<()> {
 
 pub fn handle_model(app: &mut App, args: &[&str]) -> Result<()> {
     if let Some(new_model) = args.first() {
+        // Warn on significant cost deltas. A user typing "/model gpt-4"
+        // while on haiku deserves a heads-up — ~50× output cost. We
+        // warn if output price changes ≥ 2×. 2× is a bright line: big
+        // enough to be meaningful, small enough that intra-tier
+        // switches (sonnet ↔ opus) don't nag.
+        let old_model = app.model.clone();
+        if let Some(warning) = cost_delta_warning(old_model.as_deref(), new_model) {
+            app.add_system_message(&warning);
+        }
         app.model = Some(new_model.to_string());
         app.add_system_message(&format!("Model switched to: {}", new_model));
     } else {
@@ -100,4 +109,75 @@ pub fn handle_model(app: &mut App, args: &[&str]) -> Result<()> {
         let _event_tx = app.event_tx.clone();
     }
     Ok(())
+}
+
+/// Return a warning string when swapping `old` for `new` would
+/// meaningfully change cost. `None` if there's nothing to warn about
+/// (no prior model, unknown pricing, or delta below threshold).
+///
+/// Threshold is a 2× factor on *output* price — output dominates total
+/// cost for generative workloads, and 2× is large enough that a typo
+/// or misclick is worth surfacing without pestering users who flip
+/// between similarly-priced models (e.g. sonnet ↔ opus).
+pub(crate) fn cost_delta_warning(old: Option<&str>, new: &str) -> Option<String> {
+    let old = old?;
+    if old == new {
+        return None;
+    }
+    let old_p = crate::agent::cost::get_pricing(old);
+    let new_p = crate::agent::cost::get_pricing(new);
+    // If either lookup hit the "Unknown model" hardcoded fallback, the
+    // ratio would be misleading — skip the warning.
+    if old_p.output <= 0.0 || new_p.output <= 0.0 {
+        return None;
+    }
+    let ratio = new_p.output / old_p.output;
+    if ratio >= 2.0 {
+        Some(format!(
+            "⚠ {new} is ~{ratio:.1}× more expensive than {old} for output tokens (${:.2} vs ${:.2} per 1M). /cost to track.",
+            new_p.output, old_p.output
+        ))
+    } else if ratio <= 0.5 {
+        Some(format!(
+            "ℹ {new} is ~{inverse:.1}× cheaper than {old} for output tokens (${:.2} vs ${:.2} per 1M).",
+            new_p.output,
+            old_p.output,
+            inverse = 1.0 / ratio,
+        ))
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn returns_none_when_no_old_model() {
+        assert!(cost_delta_warning(None, "claude-3-5-sonnet").is_none());
+    }
+
+    #[test]
+    fn returns_none_when_models_are_identical() {
+        assert!(cost_delta_warning(Some("claude-3-5-sonnet"), "claude-3-5-sonnet").is_none());
+    }
+
+    #[test]
+    fn warns_when_jumping_to_a_much_pricier_model() {
+        // claude-3-5-haiku ($4 output) → claude-3-opus ($75 output)
+        // is roughly 18× — well above the 2× threshold.
+        let result = cost_delta_warning(Some("claude-3-5-haiku"), "claude-3-opus");
+        assert!(result.is_some(), "expected warning for haiku → opus");
+        let msg = result.unwrap();
+        assert!(msg.contains("more expensive"), "unexpected msg: {msg}");
+    }
+
+    #[test]
+    fn informs_when_dropping_to_a_much_cheaper_model() {
+        let result = cost_delta_warning(Some("claude-3-opus"), "claude-3-5-haiku");
+        assert!(result.is_some(), "expected info for opus → haiku");
+        let msg = result.unwrap();
+        assert!(msg.contains("cheaper"), "unexpected msg: {msg}");
+    }
 }

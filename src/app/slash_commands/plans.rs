@@ -58,7 +58,14 @@ pub fn handle_plans(app: &mut App, _args: &[&str]) -> Result<()> {
         return Ok(());
     }
 
-    let mut out = format!("Plans ({}):\n", plans.len());
+    // Header disambiguates from the lookalikes: `/plan` is the
+    // read-only toggle, FocusMode::Plan biases the agent, the pipeline
+    // has a Plan *phase*. This listing is about *plan files* — the
+    // markdown artefacts the planner writes to disk.
+    let mut out = format!(
+        "Plan files ({}) — checkbox-tracked multi-phase tasks:\n",
+        plans.len()
+    );
     for entry in &plans {
         out.push_str(&format_plan_row(entry));
         out.push('\n');

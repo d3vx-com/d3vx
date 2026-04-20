@@ -17,6 +17,7 @@ mod navigation;
 mod plans;
 mod session;
 mod setup;
+mod tool_catalog;
 mod tools;
 
 use anyhow::Result;
@@ -29,6 +30,7 @@ pub use agent::{handle_compact, handle_spawn, handle_thinking, handle_vex};
 pub use core::{handle_clear, handle_cost, handle_quit, handle_status, show_help};
 pub use discovery::{daemon_is_running, handle_daemon, handle_dashboard};
 pub use plans::{handle_plans, plans_count_active};
+pub use tool_catalog::handle_tools;
 pub use modes::{
     handle_mode, handle_model, handle_plan, handle_power, handle_verbose, handle_vibe,
 };
@@ -100,6 +102,13 @@ pub const SLASH_COMMANDS: &[SlashCommand] = &[
         usage: "/plans",
         category: "Discovery",
         handler: handle_plans,
+    },
+    SlashCommand {
+        name: "tools",
+        description: "List the tools available to the agent, grouped by category",
+        usage: "/tools",
+        category: "Discovery",
+        handler: handle_tools,
     },
     // ── Modes & views ────────────────────────────────────────────
     SlashCommand {
