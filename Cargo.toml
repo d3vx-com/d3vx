@@ -2,10 +2,15 @@
 name = "d3vx"
 version = "0.1.0"
 edition = "2021"
-authors = ["d3vx team"]
-description = "High-performance autonomous software engineering CLI"
-license-file = "LICENSE"
-repository = "https://github.com/d3vx/d3vx-terminal"
+authors = ["Shubh Wadekar <shubhwadekar1@gmail.com>"]
+description = "Autonomous coding agent in your terminal — background vex tasks, 7-phase pipeline, multi-provider LLMs, live dashboard. Rust TUI."
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/d3vx-com/d3vx"
+homepage = "https://github.com/d3vx-com/d3vx"
+documentation = "https://github.com/d3vx-com/d3vx"
+keywords = ["ai-agent", "coding-agent", "claude-code", "llm", "tui"]
+categories = ["command-line-utilities", "development-tools"]
 
 [features]
 default = []
