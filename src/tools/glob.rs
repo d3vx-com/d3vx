@@ -69,30 +69,14 @@ impl Tool for GlobTool {
             Path::new(&context.cwd).join(search_path)
         };
 
-        // Use globwalk for recursive glob matching
-        let mut matches: Vec<std::path::PathBuf> = Vec::new();
-
-        match globwalk::GlobWalkerBuilder::from_patterns(&base_path, &[pattern])
-            .case_insensitive(true)
-            .build()
-        {
-            Ok(walker) => {
-                for entry in walker {
-                    match entry {
-                        Ok(entry) => {
-                            matches.push(entry.path().to_path_buf());
-                        }
-                        Err(e) => {
-                            // Log error but continue
-                            eprintln!("Glob error: {}", e);
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                return ToolResult::error(format!("Invalid glob pattern: {}", e));
-            }
-        }
+        // Walk with the panic-safe helper (globwalk 0.9 unwraps a
+        // strip_prefix internally and aborts the process on certain
+        // symlink / path-normalisation cases).
+        let mut matches: Vec<std::path::PathBuf> =
+            match crate::utils::glob_walk::walk_matching(&base_path, pattern, true) {
+                Ok(m) => m,
+                Err(e) => return ToolResult::error(format!("Invalid glob pattern: {}", e)),
+            };
 
         // Sort by modification time (newest first)
         matches.sort_by(|a, b| {

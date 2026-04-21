@@ -125,13 +125,13 @@ impl Tool for GrepTool {
             // Walk directory
             let mut files = Vec::new();
             if let Some(glob) = glob_pattern {
-                // Use glob pattern
-                if let Ok(walker) =
-                    globwalk::GlobWalkerBuilder::from_patterns(&base_path, &[glob]).build()
+                // Panic-safe walker; replaces the globwalk dependency.
+                if let Ok(paths) =
+                    crate::utils::glob_walk::walk_matching(&base_path, glob, false)
                 {
-                    for entry in walker.flatten() {
-                        if entry.path().is_file() {
-                            files.push(entry.path().to_path_buf());
+                    for path in paths {
+                        if path.is_file() {
+                            files.push(path);
                         }
                     }
                 }
