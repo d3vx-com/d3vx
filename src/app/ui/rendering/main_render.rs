@@ -35,26 +35,34 @@ impl App {
     pub fn render(&mut self, f: &mut Frame) {
         let size = f.area();
 
-        // Check for specific modes that override the main layout
-        match self.ui.mode {
-            AppMode::DiffPreview => {
+        // Full-screen overlays get dispatched first — they take over
+        // the whole viewport rather than composing with the main view.
+        // (Help and CommandPalette are modal popups, handled later in
+        // the render flow since they overlay the normal layout.)
+        use crate::app::state::Overlay;
+        match self.ui.overlay {
+            Some(Overlay::DiffPreview) => {
                 if let Some(ref diff) = self.diff_view {
                     diff.render(f, size, &self.ui.theme);
                     return;
                 }
             }
-            AppMode::UndoPicker => {
+            Some(Overlay::UndoPicker) => {
                 if let Some(ref picker) = self.undo_picker {
                     picker.render(f, size, &self.ui.theme);
                     return;
                 }
             }
-            AppMode::SessionPicker => {
+            Some(Overlay::SessionPicker) => {
                 if let Some(ref picker) = self.session_picker {
                     picker.render(f, size, &self.ui.theme);
                     return;
                 }
             }
+            _ => {}
+        }
+
+        match self.ui.mode {
             AppMode::Board => {
                 let _ = self.refresh_task_views();
                 if self.ui.right_sidebar_visible {
@@ -262,7 +270,7 @@ impl App {
         }
 
         // Render command palette overlay
-        if self.ui.mode == AppMode::CommandPalette {
+        if self.ui.overlay_is(Overlay::CommandPalette) {
             self.render_command_palette(f, size);
         }
 
@@ -274,7 +282,7 @@ impl App {
         }
 
         // Render Help overlay
-        if self.ui.mode == AppMode::Help {
+        if self.ui.overlay_is(Overlay::Help) {
             f.render_widget(
                 crate::ui::widgets::HelpModal::new(self.ui.theme.clone(), self.ui.help_scroll),
                 size,

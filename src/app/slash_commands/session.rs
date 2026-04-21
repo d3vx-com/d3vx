@@ -12,7 +12,7 @@ pub fn handle_undo(app: &mut App, _args: &[&str]) -> Result<()> {
         &app.session.messages,
         &app.session.file_change_log,
     ));
-    app.ui.mode = AppMode::UndoPicker;
+    app.ui.enter_overlay(crate::app::state::Overlay::UndoPicker);
     Ok(())
 }
 
@@ -52,7 +52,7 @@ pub fn handle_resume(app: &mut App, args: &[&str]) -> Result<()> {
         }
 
         app.session_picker = Some(crate::ui::widgets::SessionPicker::new(sessions));
-        app.ui.enter_overlay_mode(AppMode::SessionPicker);
+        app.ui.enter_overlay(crate::app::state::Overlay::SessionPicker);
     }
     Ok(())
 }

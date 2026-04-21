@@ -365,7 +365,7 @@ impl App {
                             sessions.len()
                         );
                         app.session_picker = Some(crate::ui::widgets::SessionPicker::new(sessions));
-                        app.ui.mode = AppMode::SessionPicker;
+                        app.ui.enter_overlay(crate::app::state::Overlay::SessionPicker);
                     }
                 }
             }

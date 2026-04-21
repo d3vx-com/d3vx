@@ -4,7 +4,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::slash_commands;
-use crate::app::{App, AppMode};
+use crate::app::App;
 
 impl App {
     /// Handle pasted text — bulk-insert into input buffer at cursor position.
@@ -160,7 +160,7 @@ impl App {
 
             // Quick Help
             (KeyCode::Char('?'), mods) if mods.is_empty() && self.ui.input_buffer.is_empty() => {
-                self.ui.enter_overlay_mode(AppMode::Help);
+                self.ui.enter_overlay(crate::app::state::Overlay::Help);
             }
 
             // Input navigation

@@ -4,7 +4,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::state::{DrawerHeight, RightPaneTab};
-use crate::app::{App, AppMode};
+use crate::app::App;
 
 impl App {
     /// Handle chat input key events (delegates to navigation for text keys)
@@ -171,10 +171,10 @@ impl App {
                     self.diff_view = self.diff_preview.clone();
                 }
                 if self.diff_view.is_some() {
-                    if self.ui.mode == AppMode::DiffPreview {
-                        self.ui.exit_overlay_mode();
+                    if self.ui.overlay_is(crate::app::state::Overlay::DiffPreview) {
+                        self.ui.exit_overlay();
                     } else {
-                        self.ui.enter_overlay_mode(AppMode::DiffPreview);
+                        self.ui.enter_overlay(crate::app::state::Overlay::DiffPreview);
                     }
                 }
             }

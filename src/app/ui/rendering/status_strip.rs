@@ -232,14 +232,16 @@ fn sep() -> Span<'static> {
 }
 
 /// Map the current AppMode to a glyph + short label for the strip.
+/// Overlays (Help / CommandPalette / DiffPreview / UndoPicker /
+/// SessionPicker) are *not* shown here — they're orthogonal to the
+/// main view and dismiss on Esc. A user who opened `?` from Board
+/// should still see `▣ board` so they know what they'll return to.
 fn mode_indicator(app: &App) -> (&'static str, &'static str) {
     use crate::app::AppMode;
     match app.ui.mode {
         AppMode::Chat => ("\u{25CB}", "chat"),
         AppMode::Board => ("\u{25A3}", "board"),
         AppMode::List => ("\u{2261}", "list"),
-        AppMode::CommandPalette => ("\u{25C9}", "palette"),
-        AppMode::Help => ("?", "help"),
         _ => ("\u{25CB}", "chat"),
     }
 }

@@ -183,7 +183,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_esc_closes_command_palette() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::CommandPalette;
+        app.ui.enter_overlay(crate::app::state::Overlay::CommandPalette);
         app.handle_key_event(key(KeyCode::Esc)).await.unwrap();
         assert_eq!(app.ui.mode, AppMode::Chat);
     }
@@ -194,13 +194,13 @@ mod tests {
         // '?' in empty input buffer opens help
         app.ui.input_buffer.clear();
         app.handle_key_event(key(KeyCode::Char('?'))).await.unwrap();
-        assert_eq!(app.ui.mode, AppMode::Help);
+        assert_eq!(app.ui.overlay, Some(crate::app::state::Overlay::Help));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_esc_closes_help() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::Help;
+        app.ui.enter_overlay(crate::app::state::Overlay::Help);
         app.handle_key_event(key(KeyCode::Esc)).await.unwrap();
         assert_eq!(app.ui.mode, AppMode::Chat);
     }
@@ -208,7 +208,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_esc_closes_diff_preview() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::DiffPreview;
+        app.ui.enter_overlay(crate::app::state::Overlay::DiffPreview);
         app.handle_key_event(key(KeyCode::Esc)).await.unwrap();
         assert_eq!(app.ui.mode, AppMode::Chat);
     }
@@ -216,7 +216,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_q_closes_diff_preview() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::DiffPreview;
+        app.ui.enter_overlay(crate::app::state::Overlay::DiffPreview);
         app.handle_key_event(key(KeyCode::Char('q'))).await.unwrap();
         assert_eq!(app.ui.mode, AppMode::Chat);
     }
@@ -240,7 +240,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_esc_closes_undo_picker() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::UndoPicker;
+        app.ui.enter_overlay(crate::app::state::Overlay::UndoPicker);
         app.undo_picker = Some(crate::ui::widgets::UndoPicker::default());
         app.handle_key_event(key(KeyCode::Esc)).await.unwrap();
         assert_eq!(app.ui.mode, AppMode::Chat);
@@ -250,7 +250,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_esc_closes_session_picker() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::SessionPicker;
+        app.ui.enter_overlay(crate::app::state::Overlay::SessionPicker);
         app.session_picker = Some(crate::ui::widgets::SessionPicker::new(Vec::new()));
         app.handle_key_event(key(KeyCode::Esc)).await.unwrap();
         assert_eq!(app.ui.mode, AppMode::Chat);
@@ -269,7 +269,7 @@ mod tests {
         app.handle_key_event(key_mod(KeyCode::Char('d'), KeyModifiers::CONTROL))
             .await
             .unwrap();
-        assert_eq!(app.ui.mode, AppMode::DiffPreview);
+        assert_eq!(app.ui.overlay, Some(crate::app::state::Overlay::DiffPreview));
 
         // Ctrl+D exits diff preview first, re-enter requires going back to Chat mode
         // The DiffPreview handler handles Esc/q, not Ctrl+D
@@ -663,7 +663,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_command_palette_typing_filters() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::CommandPalette;
+        app.ui.enter_overlay(crate::app::state::Overlay::CommandPalette);
 
         app.handle_key_event(key(KeyCode::Char('h'))).await.unwrap();
         assert_eq!(app.command_palette_filter, "h");
@@ -676,7 +676,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_command_palette_backspace() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::CommandPalette;
+        app.ui.enter_overlay(crate::app::state::Overlay::CommandPalette);
         app.command_palette_filter = "hel".to_string();
 
         app.handle_key_event(key(KeyCode::Backspace)).await.unwrap();
@@ -686,7 +686,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_command_palette_arrow_navigation() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::CommandPalette;
+        app.ui.enter_overlay(crate::app::state::Overlay::CommandPalette);
 
         // Down arrow selects next item
         app.handle_key_event(key(KeyCode::Down)).await.unwrap();
@@ -700,7 +700,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_command_palette_up_at_top_stays() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::CommandPalette;
+        app.ui.enter_overlay(crate::app::state::Overlay::CommandPalette);
         app.command_palette_selected = 0;
 
         app.handle_key_event(key(KeyCode::Up)).await.unwrap();
@@ -714,7 +714,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_diff_view_scroll_down_j() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::DiffPreview;
+        app.ui.enter_overlay(crate::app::state::Overlay::DiffPreview);
         app.diff_view = Some(crate::ui::widgets::DiffView::new(
             "test.rs",
             "+ line\n- line\n  line\n",
@@ -722,20 +722,20 @@ mod tests {
 
         app.handle_key_event(key(KeyCode::Char('j'))).await.unwrap();
         // Should scroll down without changing mode
-        assert_eq!(app.ui.mode, AppMode::DiffPreview);
+        assert_eq!(app.ui.overlay, Some(crate::app::state::Overlay::DiffPreview));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_diff_view_scroll_up_k() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::DiffPreview;
+        app.ui.enter_overlay(crate::app::state::Overlay::DiffPreview);
         app.diff_view = Some(crate::ui::widgets::DiffView::new(
             "test.rs",
             "+ line\n- line\n",
         ));
 
         app.handle_key_event(key(KeyCode::Char('k'))).await.unwrap();
-        assert_eq!(app.ui.mode, AppMode::DiffPreview);
+        assert_eq!(app.ui.overlay, Some(crate::app::state::Overlay::DiffPreview));
     }
 
     // ========================================================================
@@ -885,13 +885,13 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_mode_isolation_chat_keys_in_command_palette() {
         let mut app = test_app().await;
-        app.ui.mode = AppMode::CommandPalette;
+        app.ui.enter_overlay(crate::app::state::Overlay::CommandPalette);
 
         // Ctrl+C should NOT quit while in command palette
         // (command palette handler handles its own keys)
         app.handle_key_event(key(KeyCode::Char('a'))).await.unwrap();
         assert_eq!(app.command_palette_filter, "a");
-        assert_eq!(app.ui.mode, AppMode::CommandPalette);
+        assert_eq!(app.ui.overlay, Some(crate::app::state::Overlay::CommandPalette));
         assert!(!app.should_quit);
     }
 
@@ -912,7 +912,7 @@ mod tests {
         let mut app = test_app().await;
 
         // 1. Manually enter command palette mode (no longer toggled by Ctrl+P)
-        app.ui.mode = AppMode::CommandPalette;
+        app.ui.enter_overlay(crate::app::state::Overlay::CommandPalette);
 
         // 2. Type a filter
         app.handle_key_event(key(KeyCode::Char('h'))).await.unwrap();
@@ -930,7 +930,7 @@ mod tests {
 
         // Chat → Help → Chat → PowerMode (Ctrl+P) → Chat
         app.handle_key_event(key(KeyCode::Char('?'))).await.unwrap();
-        assert_eq!(app.ui.mode, AppMode::Help);
+        assert_eq!(app.ui.overlay, Some(crate::app::state::Overlay::Help));
 
         app.handle_key_event(key(KeyCode::Esc)).await.unwrap();
         assert_eq!(app.ui.mode, AppMode::Chat);

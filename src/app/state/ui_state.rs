@@ -8,6 +8,7 @@ use std::time::Instant;
 
 use crate::app::state::FocusMode;
 use crate::app::state::RightPaneTab;
+use crate::app::state::Overlay;
 use crate::app::AppMode;
 use crate::ui::theme::Theme;
 
@@ -23,14 +24,14 @@ pub struct UIState {
     // ════════════════════════════════════════════════════════════════════════════
     // Mode and Display Settings
     // ════════════════════════════════════════════════════════════════════════════
-    /// Current application mode
+    /// Which main view is showing (Chat / Board / List / etc.). See
+    /// [`AppMode`] docs for the split between main view and overlay.
     pub mode: AppMode,
-    /// The mode we were in before entering an overlay (Help today; the
-    /// pattern generalises to other transient overlays). Stored so Esc
-    /// can restore context instead of always dumping the user to Chat —
-    /// a user who opens `?` from Board should return to Board, not
-    /// lose their place.
-    pub prior_mode: Option<AppMode>,
+    /// The transient overlay on top of the main view, if any. At most
+    /// one at a time. Dismissing an overlay returns to whatever
+    /// `mode` was — no separate "prior_mode" tracking needed because
+    /// entering an overlay no longer clobbers `mode`.
+    pub overlay: Option<Overlay>,
     /// Read-only plan mode (blocks write tools)
     pub plan_mode: bool,
     /// Verbose mode (expanded tool calls)
@@ -200,7 +201,7 @@ impl Default for UIState {
     fn default() -> Self {
         Self {
             mode: AppMode::Chat,
-            prior_mode: None,
+            overlay: None,
             plan_mode: false,
             verbose: false,
             power_mode: false,
@@ -295,22 +296,22 @@ impl UIState {
         self.escape_count = 0;
     }
 
-    /// Transition into an overlay mode (Help, etc.) that should return
-    /// the user to their previous mode on dismiss. Idempotent: if an
-    /// overlay is already open, we don't overwrite `prior_mode` — the
-    /// user's real starting point is what we want to restore to.
-    pub fn enter_overlay_mode(&mut self, overlay: AppMode) {
-        if self.prior_mode.is_none() {
-            self.prior_mode = Some(self.mode);
-        }
-        self.mode = overlay;
+    /// Open a transient overlay on top of the current main view. Does
+    /// not touch `mode` — the AppMode and Overlay are orthogonal.
+    pub fn enter_overlay(&mut self, overlay: Overlay) {
+        self.overlay = Some(overlay);
     }
 
-    /// Dismiss the current overlay, restoring the mode we came from
-    /// (or `Chat` if we never tracked one). Resets `prior_mode` so a
-    /// subsequent overlay entry saves fresh context.
-    pub fn exit_overlay_mode(&mut self) {
-        self.mode = self.prior_mode.take().unwrap_or(AppMode::Chat);
+    /// Close the current overlay, restoring normal input routing to
+    /// the underlying `mode`. No-op if no overlay is active.
+    pub fn exit_overlay(&mut self) {
+        self.overlay = None;
+    }
+
+    /// True iff the given overlay is currently showing. Shorthand for
+    /// `self.overlay == Some(overlay)`.
+    pub fn overlay_is(&self, overlay: Overlay) -> bool {
+        self.overlay == Some(overlay)
     }
 
     /// Insert a character at the cursor position
@@ -427,46 +428,43 @@ mod tests {
     }
 
     #[test]
-    fn overlay_entry_saves_prior_and_switches_mode() {
+    fn overlay_entry_does_not_clobber_main_mode() {
         let mut state = UIState::default();
         state.mode = AppMode::Board;
-        state.enter_overlay_mode(AppMode::Help);
-        assert_eq!(state.mode, AppMode::Help);
-        assert_eq!(state.prior_mode, Some(AppMode::Board));
-    }
-
-    #[test]
-    fn overlay_exit_restores_prior_mode() {
-        let mut state = UIState::default();
-        state.mode = AppMode::Board;
-        state.enter_overlay_mode(AppMode::Help);
-        state.exit_overlay_mode();
+        state.enter_overlay(Overlay::Help);
+        // The main mode is preserved — this is the whole point of the
+        // refactor. Pre-refactor, entering Help would overwrite
+        // `mode` with AppMode::Help and rely on `prior_mode` to
+        // remember Board.
         assert_eq!(state.mode, AppMode::Board);
-        assert_eq!(state.prior_mode, None, "prior_mode should reset on exit");
+        assert_eq!(state.overlay, Some(Overlay::Help));
     }
 
     #[test]
-    fn overlay_exit_with_no_prior_defaults_to_chat() {
+    fn overlay_exit_clears_overlay_and_leaves_main_mode() {
         let mut state = UIState::default();
-        state.mode = AppMode::Help; // user directly set without entering
-        state.exit_overlay_mode();
-        assert_eq!(state.mode, AppMode::Chat);
+        state.mode = AppMode::Board;
+        state.enter_overlay(Overlay::Help);
+        state.exit_overlay();
+        assert_eq!(state.mode, AppMode::Board);
+        assert_eq!(state.overlay, None);
     }
 
     #[test]
-    fn nested_overlay_entry_preserves_deepest_prior() {
-        // Chat → DiffPreview → Help → Esc should land on DiffPreview,
-        // and another Esc should land on Chat. The enter helper is
-        // idempotent on `prior_mode`: it doesn't overwrite a saved
-        // prior with the intermediate overlay.
+    fn overlay_exit_is_idempotent_when_none_open() {
         let mut state = UIState::default();
-        state.mode = AppMode::Chat;
-        state.enter_overlay_mode(AppMode::DiffPreview);
-        state.enter_overlay_mode(AppMode::Help);
-        assert_eq!(state.mode, AppMode::Help);
-        state.exit_overlay_mode();
-        // Current contract: exit always pops to the saved prior (Chat
-        // in this flow). Nesting beyond one overlay returns to origin.
-        assert_eq!(state.mode, AppMode::Chat);
+        state.mode = AppMode::List;
+        state.exit_overlay();
+        assert_eq!(state.mode, AppMode::List);
+        assert_eq!(state.overlay, None);
+    }
+
+    #[test]
+    fn overlay_is_check() {
+        let mut state = UIState::default();
+        assert!(!state.overlay_is(Overlay::Help));
+        state.enter_overlay(Overlay::Help);
+        assert!(state.overlay_is(Overlay::Help));
+        assert!(!state.overlay_is(Overlay::DiffPreview));
     }
 }

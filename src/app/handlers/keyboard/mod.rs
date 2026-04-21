@@ -44,7 +44,7 @@ impl App {
                                 .unwrap_or_else(|| "unknown".to_string());
                             self.diff_view =
                                 Some(crate::ui::widgets::DiffView::new(&file_path, diff_content));
-                            self.ui.enter_overlay_mode(AppMode::DiffPreview);
+                            self.ui.enter_overlay(crate::app::state::Overlay::DiffPreview);
                         }
                     }
                 }
@@ -59,18 +59,22 @@ impl App {
             return Ok(());
         }
 
-        // Handle command palette mode
-        if self.ui.mode == AppMode::CommandPalette {
-            self.handle_command_palette_key(key)?;
+        // Overlays capture input first — they sit on top of any main
+        // view and drive their own keymap. If no overlay is open, fall
+        // through to the main-mode routing below.
+        use crate::app::state::Overlay;
+        if let Some(overlay) = self.ui.overlay {
+            match overlay {
+                Overlay::CommandPalette => self.handle_command_palette_key(key)?,
+                Overlay::DiffPreview => self.handle_diff_view_key(key)?,
+                Overlay::UndoPicker => self.handle_undo_picker_key(key)?,
+                Overlay::SessionPicker => self.handle_session_picker_key(key)?,
+                Overlay::Help => self.handle_help_key(key)?,
+            }
             return Ok(());
         }
 
-        // Handle diff preview mode
-        if self.ui.mode == AppMode::DiffPreview {
-            self.handle_diff_view_key(key)?;
-            return Ok(());
-        }
-
+        // Main-view routing.
         if self.ui.mode == AppMode::Board {
             self.handle_board_key(key)?;
             return Ok(());
@@ -81,25 +85,7 @@ impl App {
             return Ok(());
         }
 
-        // Handle undo picker mode
-        if self.ui.mode == AppMode::UndoPicker {
-            self.handle_undo_picker_key(key)?;
-            return Ok(());
-        }
-
-        // Handle session picker mode
-        if self.ui.mode == AppMode::SessionPicker {
-            self.handle_session_picker_key(key)?;
-            return Ok(());
-        }
-
-        // Handle help mode
-        if self.ui.mode == AppMode::Help {
-            self.handle_help_key(key)?;
-            return Ok(());
-        }
-
-        // Handle input mode
+        // Default: text input.
         self.handle_input_key(key)?;
 
         Ok(())

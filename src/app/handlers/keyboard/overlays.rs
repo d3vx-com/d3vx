@@ -10,10 +10,10 @@ impl App {
     pub(crate) fn handle_help_key(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
             KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
-                // Return to whichever mode the user was in before `?` /
-                // `/help`. Without this, opening Help from Board silently
-                // dropped them into Chat on dismiss.
-                self.ui.exit_overlay_mode();
+                // Help is an overlay. Closing it leaves `mode` (Board,
+                // List, etc.) untouched — the user returns to exactly
+                // where they were with no prior-mode bookkeeping.
+                self.ui.exit_overlay();
                 self.ui.help_scroll = 0;
             }
             KeyCode::Up | KeyCode::Char('k') => {
@@ -37,7 +37,7 @@ impl App {
     pub(crate) fn handle_diff_view_key(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => {
-                self.ui.exit_overlay_mode();
+                self.ui.exit_overlay();
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 if let Some(ref mut diff) = self.diff_view {
@@ -69,7 +69,7 @@ impl App {
     pub(crate) fn handle_session_picker_key(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => {
-                self.ui.exit_overlay_mode();
+                self.ui.exit_overlay();
                 self.session_picker = None;
             }
             KeyCode::Up | KeyCode::Char('k') => {
@@ -98,7 +98,7 @@ impl App {
                         }
                     }
                 }
-                self.ui.exit_overlay_mode();
+                self.ui.exit_overlay();
                 self.session_picker = None;
             }
             _ => {}

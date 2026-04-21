@@ -5,7 +5,7 @@ use anyhow::Result;
 use super::*;
 
 pub fn show_help(app: &mut App, _args: &[&str]) -> Result<()> {
-    app.ui.enter_overlay_mode(AppMode::Help);
+    app.ui.enter_overlay(crate::app::state::Overlay::Help);
     app.ui.help_scroll = 0;
     Ok(())
 }

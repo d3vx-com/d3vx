@@ -3,21 +3,45 @@
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
-/// Application mode
+/// The main view. Exactly one of these is showing at any time; the
+/// value changes only on explicit user action (slash command or key).
+///
+/// Previously this enum also carried overlay states (Help,
+/// CommandPalette, DiffPreview, UndoPicker, SessionPicker). Those
+/// were conceptually orthogonal — an overlay *sits on top of* a main
+/// view, it doesn't *replace* it — but collapsing them into one enum
+/// meant opening `?` from Board would silently drop the user into
+/// Chat. See [`Overlay`] for the new model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AppMode {
     #[default]
     Chat,
     Plan,
     Verbose,
+    Settings,
+    Board,
+    List,
+}
+
+/// Transient overlays that sit *on top of* an [`AppMode`] rather than
+/// replacing it. At most one is active at a time (`Option<Overlay>`
+/// on `UIState`); dismiss with `Esc` returns the user to whichever
+/// `AppMode` they were on, with no separate "remember prior mode"
+/// bookkeeping required.
+///
+/// Some overlays (`DiffPreview`, `UndoPicker`, `SessionPicker`)
+/// currently take over the full screen when active — the main view
+/// is obscured rather than shown behind. Others (`Help`,
+/// `CommandPalette`) are modal popups with the main view still
+/// visible behind. Both behaviours coexist under this single
+/// `Option<Overlay>` state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Overlay {
+    Help,
     CommandPalette,
     DiffPreview,
     UndoPicker,
     SessionPicker,
-    Settings,
-    Help,
-    Board,
-    List,
 }
 
 /// Focused inspector tab in the right pane.
